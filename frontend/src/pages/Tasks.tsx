@@ -1,214 +1,199 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, Circle, CheckCircle2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { assignmentService, Assignment } from "@/services/assignmentService";
+import { courseService, Course } from "@/services/courseService";
+import { authService } from "@/services/authService";
+import { Calendar, Clock, Plus, Trash2, Pencil, AlertCircle, Loader2, CheckCircle2, PlayCircle, Timer, Search } from "lucide-react";
+import { format } from "date-fns";
 
-const taskStats = [
-  { label: "Pending", count: 4, color: "bg-lms-coral-light", iconColor: "text-lms-coral", icon: AlertCircle },
-  { label: "In Progress", count: 2, color: "bg-lms-orange-light", iconColor: "text-lms-orange", icon: Clock },
-  { label: "Completed", count: 1, color: "bg-lms-green-light", iconColor: "text-lms-green", icon: CheckCircle2 },
-];
-
-const tasks = [
-  {
-    id: 1,
-    title: "Final Project Report",
-    course: "Software Engineering",
-    courseColor: "bg-lms-blue",
-    description: "Complete and submit the final project documentation with UML diagrams.",
-    date: "Oct 25, 2025",
-    time: "11:59 PM",
-    points: 100,
-    priority: "high",
-    type: "assignment",
-    status: "pending",
-  },
-  {
-    id: 2,
-    title: "Weekly Quiz Chapter 5",
-    course: "Data Structures",
-    courseColor: "bg-lms-purple",
-    description: "Quiz covering binary trees, heaps, and graph algorithms.",
-    date: "Oct 24, 2025",
-    time: "3:00 PM",
-    points: 50,
-    priority: "high",
-    type: "quiz",
-    status: "pending",
-  },
-  {
-    id: 3,
-    title: "Lab Assignment 4",
-    course: "Database Systems",
-    courseColor: "bg-lms-green",
-    description: "Design and implement a normalized database schema for an e-commerce system.",
-    date: "Oct 26, 2025",
-    time: "5:00 PM",
-    points: 75,
-    priority: "medium",
-    type: "lab",
-    status: "in-progress",
-  },
-  {
-    id: 4,
-    title: "Research Paper Review",
-    course: "Machine Learning",
-    courseColor: "bg-lms-coral",
-    description: "Review and critique a research paper on neural networks.",
-    date: "Oct 28, 2025",
-    time: "11:59 PM",
-    points: 60,
-    priority: "medium",
-    type: "assignment",
-    status: "pending",
-  },
-  {
-    id: 5,
-    title: "Code Review Exercise",
-    course: "Software Engineering",
-    courseColor: "bg-lms-blue",
-    description: "Review peer code submissions and provide constructive feedback.",
-    date: "Oct 23, 2025",
-    time: "11:59 PM",
-    points: 30,
-    priority: "low",
-    type: "exercise",
-    status: "completed",
-  },
-  {
-    id: 6,
-    title: "Midterm Exam Preparation",
-    course: "Data Structures",
-    courseColor: "bg-lms-purple",
-    description: "Study all materials from chapters 1-6 for the midterm exam.",
-    date: "Oct 30, 2025",
-    time: "2:00 PM",
-    points: 150,
-    priority: "high",
-    type: "exam",
-    status: "pending",
-  },
-  {
-    id: 7,
-    title: "Frontend Implementation",
-    course: "Web Development",
-    courseColor: "bg-lms-orange",
-    description: "Build responsive UI components using React and Tailwind CSS.",
-    date: "Oct 27, 2025",
-    time: "11:59 PM",
-    points: 80,
-    priority: "medium",
-    type: "project",
-    status: "in-progress",
-  },
-];
-
-const priorityColors = {
-  high: "bg-lms-coral text-card",
-  medium: "bg-lms-orange text-card",
-  low: "bg-lms-green text-card",
-};
-
-const statusIcons = {
-  pending: Circle,
-  "in-progress": AlertCircle,
-  completed: CheckCircle2,
-};
+type TaskStatus = "pending" | "in-progress" | "completed";
 
 export default function Tasks() {
-  const [filter, setFilter] = useState("all");
+  const { toast } = useToast();
+  const [tasks, setTasks] = useState<Assignment[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Assignment[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({ title: "", description: "", due_date: "", course: "" });
+  const [taskStatuses, setTaskStatuses] = useState<Record<number, TaskStatus>>({});
 
-  const filteredTasks = tasks.filter((task) => {
-    if (filter === "all") return true;
-    if (filter === "in-progress") return task.status === "in-progress";
-    return task.status === filter;
-  });
+  const user = authService.getUser();
+  
+  // ATURAN HAK AKSES
+  const isAdmin = user?.role === 'admin';
+  const isLecturer = user?.role === 'lecturer';
+  
+  // Admin: Bisa CRUD (Tambah, Edit, Hapus)
+  // Lecturer: Hanya Bisa TAMBAH
+  // Student: Hanya View & Ubah Status
+  const canAdd = isAdmin || isLecturer;
+  const canEditDelete = isAdmin; // Hanya admin yang bisa edit/hapus
+
+  useEffect(() => {
+    fetchData();
+    const saved = localStorage.getItem('taskStatuses');
+    if (saved) setTaskStatuses(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery) {
+      setFilteredTasks(tasks);
+    } else {
+      const lower = searchQuery.toLowerCase();
+      const filtered = tasks.filter(t => t.title.toLowerCase().includes(lower) || t.description.toLowerCase().includes(lower));
+      setFilteredTasks(filtered);
+    }
+  }, [searchQuery, tasks]);
+
+  const updateTaskStatus = (taskId: number, status: TaskStatus) => {
+    const newStatuses = { ...taskStatuses, [taskId]: status };
+    setTaskStatuses(newStatuses);
+    localStorage.setItem('taskStatuses', JSON.stringify(newStatuses));
+    toast({ title: "Status Diperbarui" });
+  };
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [tasksData, coursesData] = await Promise.all([assignmentService.getAll(), courseService.getAll()]);
+      // @ts-ignore
+      setTasks(Array.isArray(tasksData) ? tasksData : tasksData.results || []);
+      // @ts-ignore
+      setCourses(Array.isArray(coursesData) ? coursesData : coursesData.results || []);
+    } catch (error) { console.error(error); } finally { setIsLoading(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        ...formData,
+        course: parseInt(formData.course),
+        due_date: new Date(formData.due_date).toISOString() 
+      };
+      if (editingId) {
+        await assignmentService.update(editingId, payload);
+        toast({ title: "Tugas Diperbarui" });
+      } else {
+        await assignmentService.create(payload);
+        toast({ title: "Tugas Dibuat" });
+      }
+      setIsDialogOpen(false);
+      setEditingId(null);
+      setFormData({ title: "", description: "", due_date: "", course: "" });
+      fetchData();
+    } catch (error) { toast({ title: "Gagal", variant: "destructive" }); } finally { setIsSubmitting(false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    if(!confirm("Hapus tugas?")) return;
+    await assignmentService.delete(id);
+    fetchData();
+  };
+
+  const handleEdit = (task: Assignment) => {
+    setEditingId(task.id);
+    setFormData({
+      title: task.title,
+      description: task.description,
+      due_date: task.due_date.substring(0, 16),
+      course: task.course.toString()
+    });
+    setIsDialogOpen(true);
+  };
 
   return (
     <MainLayout>
-      <div className="max-w-4xl mx-auto animate-fade-in">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">My Tasks</h1>
-          <p className="text-muted-foreground">Track and manage all your assignments and deadlines</p>
+      <div className="max-w-5xl mx-auto animate-fade-in">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+          <div><h1 className="text-2xl font-bold">Daftar Tugas</h1><p className="text-muted-foreground">Kelola tugas mahasiswa.</p></div>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Cari tugas..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            
+            {/* Tombol Tambah: Muncul untuk Admin & Lecturer */}
+            {canAdd && (
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {setIsDialogOpen(open); if(!open) {setEditingId(null); setFormData({title:"", description:"", due_date:"", course:""})}}}>
+                <DialogTrigger asChild><Button className="bg-lms-orange hover:bg-orange-600 whitespace-nowrap"><Plus className="w-4 h-4 mr-2" /> Buat Tugas</Button></DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>{editingId ? "Edit" : "Buat"} Tugas</DialogTitle></DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <Input placeholder="Judul Tugas" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
+                    <Select value={formData.course} onValueChange={val => setFormData({...formData, course: val})}>
+                        <SelectTrigger><SelectValue placeholder="Pilih Mata Kuliah" /></SelectTrigger>
+                        <SelectContent>{courses.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input type="datetime-local" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} required />
+                    <Textarea placeholder="Deskripsi" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
+                    <DialogFooter><Button type="submit" disabled={isSubmitting}>Simpan</Button></DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {taskStats.map((stat) => (
-            <Card key={stat.label} className={`p-4 ${stat.color}`}>
-              <div className="flex items-center gap-3">
-                <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.count}</p>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        {/* LIST TUGAS */}
+        <div className="grid gap-4">
+            {filteredTasks.map((task) => {
+                const status = taskStatuses[task.id] || 'pending';
+                return (
+                    <Card key={task.id} className="p-6 hover:shadow-md transition-all border-l-4 border-l-lms-blue">
+                        <div className="flex flex-col md:flex-row gap-4 justify-between">
+                            <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="secondary">{task.course_detail?.name || 'Umum'}</Badge>
+                                    {/* Status Badge hanya untuk Student */}
+                                    {!canAdd && (
+                                        <Badge variant="outline" className={status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}>
+                                            {status === 'completed' ? 'Selesai' : 'Pending'}
+                                        </Badge>
+                                    )}
+                                </div>
+                                <h3 className="font-bold text-lg">{task.title}</h3>
+                                <p className="text-muted-foreground text-sm">{task.description}</p>
+                                <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+                                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {format(new Date(task.due_date), "dd MMM yyyy")}</span>
+                                </div>
+                            </div>
 
-        <Tabs defaultValue="all" className="mb-6" onValueChange={setFilter}>
-          <TabsList>
-            <TabsTrigger value="all">All Tasks</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="space-y-4">
-          {filteredTasks.map((task) => {
-            const StatusIcon = statusIcons[task.status as keyof typeof statusIcons];
-            return (
-              <Card key={task.id} className="p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4">
-                  <StatusIcon className={`h-5 w-5 mt-1 ${
-                    task.status === "completed" ? "text-lms-green" : 
-                    task.status === "in-progress" ? "text-lms-orange" : "text-muted-foreground"
-                  }`} />
-                  
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">{task.title}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`w-2 h-2 rounded-full ${task.courseColor}`} />
-                          <span className="text-sm text-muted-foreground">{task.course}</span>
+                            <div className="flex flex-col gap-2 min-w-[160px] justify-center">
+                                {/* Student: Ubah Status */}
+                                {!canAdd && (
+                                    <>
+                                        <Button variant={status === 'pending' ? "default" : "outline"} size="sm" onClick={() => updateTaskStatus(task.id, 'pending')}><Timer className="w-4 h-4 mr-2" /> Pending</Button>
+                                        <Button variant={status === 'completed' ? "default" : "outline"} size="sm" onClick={() => updateTaskStatus(task.id, 'completed')}><CheckCircle2 className="w-4 h-4 mr-2" /> Selesai</Button>
+                                    </>
+                                )}
+                                
+                                {/* Admin: Edit/Delete */}
+                                {canEditDelete && (
+                                    <div className="flex gap-2 justify-end">
+                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(task)}><Pencil className="w-4 h-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDelete(task.id)}><Trash2 className="w-4 h-4" /></Button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={priorityColors[task.priority as keyof typeof priorityColors]}>
-                          {task.priority}
-                        </Badge>
-                        <Badge variant="outline">{task.type}</Badge>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mt-2">{task.description}</p>
-
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {task.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {task.time}
-                        </span>
-                        <span className="font-medium text-foreground">{task.points} pts</span>
-                      </div>
-                      <Button size="sm" variant={task.status === "completed" ? "outline" : "default"}>
-                        {task.status === "completed" ? "View Submission" : "Start Task"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+                    </Card>
+                );
+            })}
         </div>
       </div>
     </MainLayout>

@@ -260,79 +260,75 @@ class Command(BaseCommand):
         course_data = [
             {
                 "code": "CS101",
-                "title": "Introduction to Programming",
+                "name": "Introduction to Programming",
                 "description": "Learn the fundamentals of programming using Python. This course covers variables, data types, control structures, functions, and basic object-oriented programming concepts.",
-                "credits": 3,
                 "lecturer": lecturers[0],
             },
             {
                 "code": "CS201",
-                "title": "Data Structures and Algorithms",
+                "name": "Data Structures and Algorithms",
                 "description": "Deep dive into essential data structures (arrays, linked lists, trees, graphs) and algorithms (sorting, searching, dynamic programming). Includes complexity analysis and problem-solving techniques.",
-                "credits": 4,
                 "lecturer": lecturers[0],
             },
             {
                 "code": "CS301",
-                "title": "Web Development",
+                "name": "Web Development",
                 "description": "Comprehensive web development course covering HTML, CSS, JavaScript, React, Node.js, and databases. Build full-stack web applications from scratch.",
-                "credits": 4,
                 "lecturer": lecturers[0],
             },
             {
                 "code": "DS101",
-                "title": "Introduction to Data Science",
+                "name": "Introduction to Data Science",
                 "description": "Explore data science fundamentals including data analysis, visualization, statistics, and basic machine learning using Python libraries like Pandas, NumPy, and Matplotlib.",
-                "credits": 3,
                 "lecturer": lecturers[1],
             },
             {
                 "code": "DS201",
-                "title": "Machine Learning",
+                "name": "Machine Learning",
                 "description": "Study supervised and unsupervised learning algorithms, neural networks, and deep learning. Hands-on projects using TensorFlow and scikit-learn.",
-                "credits": 4,
                 "lecturer": lecturers[1],
             },
             {
                 "code": "DS301",
-                "title": "Big Data Analytics",
+                "name": "Big Data Analytics",
                 "description": "Work with large-scale data processing using Hadoop, Spark, and cloud-based analytics platforms. Learn data warehousing and real-time analytics.",
-                "credits": 4,
                 "lecturer": lecturers[1],
             },
             {
                 "code": "CY101",
-                "title": "Cybersecurity Fundamentals",
+                "name": "Cybersecurity Fundamentals",
                 "description": "Introduction to cybersecurity principles, network security, cryptography, and threat analysis. Learn to protect systems and data from cyber attacks.",
-                "credits": 3,
                 "lecturer": lecturers[2],
             },
             {
                 "code": "CY201",
-                "title": "Ethical Hacking",
+                "name": "Ethical Hacking",
                 "description": "Hands-on course in penetration testing, vulnerability assessment, and security auditing. Learn ethical hacking techniques to identify and fix security flaws.",
-                "credits": 4,
                 "lecturer": lecturers[2],
             },
             {
                 "code": "CY301",
-                "title": "Network Security",
+                "name": "Network Security",
                 "description": "Advanced network security covering firewalls, IDS/IPS, VPNs, and secure network design. Includes wireless security and cloud security.",
-                "credits": 4,
                 "lecturer": lecturers[2],
             },
             {
                 "code": "SE101",
-                "title": "Software Engineering Principles",
+                "name": "Software Engineering Principles",
                 "description": "Learn software development lifecycle, agile methodologies, version control, testing, and project management. Build real-world applications in teams.",
-                "credits": 3,
                 "lecturer": lecturers[0],
             },
         ]
 
         for data in course_data:
+            # Pisahkan 'code' dari defaults agar tidak dikirim dua kali ke get_or_create
+            defaults = {
+                "name": data["name"],
+                "description": data["description"],
+                "lecturer": data["lecturer"]
+            }
             course, created = Course.objects.get_or_create(
-                code=data["code"], defaults=data
+                code=data["code"], defaults=defaults
             )
             courses.append(course)
 
@@ -354,8 +350,7 @@ class Command(BaseCommand):
                     student=student,
                     course=course,
                     defaults={
-                        "enrolled_at": timezone.now()
-                        - timedelta(days=random.randint(1, 60))
+                        "created_at": timezone.now() - timedelta(days=random.randint(1, 60))
                     },
                 )
                 enrollments.append(enrollment)
@@ -366,53 +361,24 @@ class Command(BaseCommand):
         """Create course materials"""
         materials = []
 
-        material_types = ["pdf", "video", "link", "document"]
-
         for course in courses:
             # Create 3-5 materials per course
             for i in range(1, 6):
                 import random
 
-                material_type = random.choice(material_types)
+                titles = [
+                    f"{course.name} - Lecture {i} Notes",
+                    f"{course.name} - Video Lecture {i}",
+                    f"{course.name} - Resource {i}",
+                ]
 
-                titles = {
-                    "pdf": [
-                        f"{course.title} - Lecture {i} Notes",
-                        f"{course.title} - Chapter {i} Summary",
-                        f"{course.title} - Study Guide {i}",
-                    ],
-                    "video": [
-                        f"{course.title} - Video Lecture {i}",
-                        f"{course.title} - Tutorial {i}",
-                        f"{course.title} - Demo {i}",
-                    ],
-                    "link": [
-                        f"{course.title} - External Resource {i}",
-                        f"{course.title} - Reference {i}",
-                        f"{course.title} - Documentation {i}",
-                    ],
-                    "document": [
-                        f"{course.title} - Slides {i}",
-                        f"{course.title} - Handout {i}",
-                        f"{course.title} - Reading {i}",
-                    ],
-                }
-
-                descriptions = {
-                    "pdf": "Comprehensive lecture notes covering key concepts and examples.",
-                    "video": "Video tutorial explaining concepts with practical demonstrations.",
-                    "link": "External resource for additional reading and reference.",
-                    "document": "Presentation slides and supplementary materials.",
-                }
-
+                # Material model fields are matched here
                 material = Material.objects.create(
                     course=course,
-                    title=random.choice(titles[material_type]),
-                    description=descriptions[material_type],
-                    material_type=material_type,
-                    content=f"Sample content for {course.title} - Material {i}",
-                    order=i,
-                    uploaded_at=timezone.now() - timedelta(days=random.randint(1, 50)),
+                    title=random.choice(titles),
+                    # Added dummy file_url as it's required in model
+                    file_url=f"https://example.com/materials/course_{course.code}_material_{i}.pdf",
+                    created_at=timezone.now() - timedelta(days=random.randint(1, 50)),
                 )
                 materials.append(material)
 
@@ -428,10 +394,10 @@ class Command(BaseCommand):
                 import random
 
                 assignment_titles = [
-                    f"{course.title} - Assignment {i}",
-                    f"{course.title} - Project {i}",
-                    f"{course.title} - Lab {i}",
-                    f"{course.title} - Quiz {i}",
+                    f"{course.name} - Assignment {i}",
+                    f"{course.name} - Project {i}",
+                    f"{course.name} - Lab {i}",
+                    f"{course.name} - Quiz {i}",
                 ]
 
                 descriptions = [
@@ -442,14 +408,12 @@ class Command(BaseCommand):
                 ]
 
                 days_until_due = random.randint(7, 30)
-                max_score = random.choice([50, 75, 100])
 
                 assignment = Assignment.objects.create(
                     course=course,
                     title=random.choice(assignment_titles),
                     description=random.choice(descriptions),
                     due_date=timezone.now() + timedelta(days=days_until_due),
-                    max_score=max_score,
                     created_at=timezone.now() - timedelta(days=random.randint(1, 40)),
                 )
                 assignments.append(assignment)
@@ -484,38 +448,27 @@ class Command(BaseCommand):
                         days=random.randint(1, 5)
                     )
 
-                text_submissions = [
-                    f"I have completed the assignment. Please find my solution attached.",
-                    f"Here is my submission for {assignment.title}. I have implemented all required features.",
-                    f"Assignment completed. All tests are passing.",
-                    f"Please review my work. I followed all the guidelines.",
-                ]
-
                 submission = Submission.objects.create(
                     assignment=assignment,
                     student=student,
-                    text_submission=random.choice(text_submissions),
+                    # Added dummy file_url
+                    file_url=f"https://example.com/submissions/{student.username}_{assignment.id}.zip",
                     submitted_at=submitted_at,
                 )
 
                 # Grade 80% of submissions
                 if random.random() < 0.8:
-                    score = random.randint(
-                        int(assignment.max_score * 0.6), assignment.max_score
-                    )
-                    submission.score = score
+                    score = random.randint(60, 100)
+                    submission.grade = score # used grade not score
 
                     feedback_options = [
-                        f"Good work! Score: {score}/{assignment.max_score}",
+                        f"Good work! Score: {score}/100",
                         f"Well done. You demonstrated understanding of the concepts.",
                         f"Nice implementation. Consider optimizing the solution.",
                         f"Excellent work! Keep it up.",
                         f"Good effort. Review the feedback comments for improvement.",
                     ]
                     submission.feedback = random.choice(feedback_options)
-                    submission.graded_at = submitted_at + timedelta(
-                        days=random.randint(1, 5)
-                    )
                     submission.save()
 
                 submissions.append(submission)
@@ -584,7 +537,7 @@ class Command(BaseCommand):
 
                 discussion = Discussion.objects.create(
                     course=course,
-                    author=author,
+                    user=author, # Used user instead of author
                     title=title,
                     content=content,
                     created_at=timezone.now() - timedelta(days=random.randint(1, 30)),
@@ -638,7 +591,7 @@ class Command(BaseCommand):
 
                 comment = DiscussionComment.objects.create(
                     discussion=discussion,
-                    author=author,
+                    user=author, # Used user instead of author
                     content=content,
                     parent=parent,
                     created_at=timezone.now() - timedelta(days=random.randint(1, 25)),

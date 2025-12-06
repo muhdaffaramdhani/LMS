@@ -1,18 +1,22 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BookOpen, CheckSquare, User, FileText } from "lucide-react"; // <--- Tambah FileText
+import { Home, BookOpen, CheckSquare, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { authService } from "@/services/authService";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { icon: Home, label: "Dashboard", path: "/" },
-  { icon: BookOpen, label: "Courses", path: "/courses" },
-  { icon: CheckSquare, label: "Tasks", path: "/tasks" },
-  { icon: FileText, label: "Laporan", path: "/reports" }, // <--- Tambah Menu Ini
-  { icon: User, label: "Profile", path: "/profile" },
+  { icon: BookOpen, label: "Kursus", path: "/courses" },
+  { icon: CheckSquare, label: "Tugas", path: "/tasks" },
+  // Laporan dihapus
+  { icon: User, label: "Profil", path: "/profile" },
 ];
 
 export function Sidebar() {
   const location = useLocation();
+  const user = authService.getUser();
+  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "U";
 
   return (
     <aside className="fixed top-0 left-0 z-40 flex flex-col w-56 h-screen bg-sidebar text-sidebar-foreground">
@@ -45,15 +49,24 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-4">
           <Avatar className="w-10 h-10">
-            <AvatarFallback>MD</AvatarFallback>
+            <AvatarFallback className="text-sidebar-foreground bg-sidebar-accent">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Muhammad Daffa Ramdhani</p>
-            <p className="text-xs text-sidebar-foreground/60">Student</p>
+            <p className="text-sm font-medium truncate">{user?.username || "User"}</p>
+            <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role || "Student"}</p>
           </div>
         </div>
+        
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start text-red-400 hover:text-red-500 hover:bg-red-950/20 pl-0"
+          onClick={() => authService.logout()}
+        >
+          <LogOut className="w-5 h-5 mr-3" />
+          Keluar
+        </Button>
       </div>
     </aside>
   );

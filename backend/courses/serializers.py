@@ -9,8 +9,16 @@ class CourseSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Course
-        fields = ['id', 'name', 'code', 'description', 'lecturer', 'lecturer_detail', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        # Tambahkan 'image' ke dalam fields
+        fields = ['id', 'name', 'code', 'description', 'image', 'lecturer', 'lecturer_detail', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'lecturer']
+        
+    def create(self, validated_data):
+        # Otomatis set lecturer dari user yang sedang login
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['lecturer'] = request.user
+        return super().create(validated_data)
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):

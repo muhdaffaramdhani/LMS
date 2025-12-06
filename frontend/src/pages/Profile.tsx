@@ -1,158 +1,228 @@
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { BookOpen, Award, TrendingUp, Calendar, Mail, Phone, MapPin, Edit } from "lucide-react";
-
-const stats = [
-  { icon: BookOpen, label: "Total Courses", value: "12", color: "bg-lms-blue" },
-  { icon: Award, label: "Completed", value: "7", color: "bg-lms-orange" },
-  { icon: TrendingUp, label: "GPA", value: "3.85", color: "bg-lms-purple" },
-  { icon: Calendar, label: "Credits", value: "42", color: "bg-lms-coral" },
-];
-
-const recentActivity = [
-  { action: "Submitted assignment", course: "Software Engineering", time: "2h ago", color: "bg-lms-blue" },
-  { action: "Completed quiz", course: "Data Structures", time: "1d ago", color: "bg-lms-green" },
-  { action: "Joined discussion", course: "Database Systems", time: "2d ago", color: "bg-lms-purple" },
-];
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { authService, UserData } from "@/services/authService";
+import { courseService, Course } from "@/services/courseService";
+import { useToast } from "@/hooks/use-toast";
+import { BookOpen, User as UserIcon, Mail, Pencil, Loader2 } from "lucide-react";
 
 export default function Profile() {
+  const { toast } = useToast();
+  const [user, setUser] = useState<UserData | null>(authService.getUser());
+  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Form Data - Inisialisasi dengan data user yang ada
+  const [formData, setFormData] = useState({
+    first_name: user?.first_name || "",
+    last_name: user?.last_name || "",
+    email: user?.email || "",
+    password: ""
+  });
+
+  useEffect(() => {
+    // Update form jika user state berubah (misal setelah refresh)
+    if (user) {
+      setFormData({
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        email: user.email || "",
+        password: ""
+      });
+    }
+    
+    courseService.getAll().then((data) => {
+        // @ts-ignore
+        const list = Array.isArray(data) ? data : data.results || [];
+        setEnrolledCourses(list.slice(0, 3));
+    });
+  }, [user]); // Dependensi ke user
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) return; 
+
+    setIsLoading(true);
+    try {
+      const payload: any = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email
+      };
+      if (formData.password) payload.password = formData.password;
+
+      await authService.updateProfile(user.id, payload);
+      
+      const updatedUser = authService.getUser();
+      setUser(updatedUser);
+      
+      setIsEditing(false);
+      // Trigger event untuk update Header
+      window.dispatchEvent(new Event('auth-update'));
+      
+      toast({ title: "Profil Diperbarui", description: "Data Anda berhasil disimpan." });
+    } catch (error) {
+      toast({ title: "Gagal", description: "Terjadi kesalahan.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Tampilan Nama Lengkap yang Benar
+  const fullName = (user?.first_name && user?.last_name) 
+    ? `${user.first_name} ${user.last_name}` 
+    : (user?.first_name || user?.username);
+
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in">
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {stats.map((stat) => (
-            <Card key={stat.label} className="p-4">
-              <div className={`inline-flex p-2.5 rounded-xl ${stat.color} mb-3`}>
-                <stat.icon className="h-5 w-5 text-card" />
-              </div>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <p className="text-2xl font-bold">{stat.value}</p>
-            </Card>
-          ))}
-        </div>
-
-        <Card className="p-6 mb-6">
-          <div className="flex items-start gap-6">
-            <div className="relative">
-              <Avatar className="h-24 w-24">
-                <AvatarFallback className="text-2xl">MD</AvatarFallback>
+      <div className="max-w-4xl mx-auto animate-fade-in">
+        <Card className="mb-8 overflow-hidden border-none shadow-md">
+          <div className="h-32 bg-gradient-to-r from-lms-blue to-lms-purple"></div>
+          <div className="px-8 pb-8">
+            <div className="relative flex items-end -mt-12 mb-4">
+              <Avatar className="w-24 h-24 border-4 border-background shadow-sm">
+                <AvatarFallback className="text-3xl bg-white text-lms-blue font-bold">
+                  {fullName?.[0]?.toUpperCase()}
+                </AvatarFallback>
               </Avatar>
-              <button className="absolute bottom-0 right-0 p-1.5 bg-lms-purple rounded-full text-card">
-                <Edit className="h-3.5 w-3.5" />
-              </button>
+              <div className="ml-4 mb-1 pt-12">
+                <h2 className="text-2xl font-bold capitalize">{fullName}</h2>
+                <div className="flex items-center gap-2 text-muted-foreground mt-1">
+                    <Badge variant="secondary" className="capitalize">
+                        {user?.role || "User"}
+                    </Badge>
+                    <span className="text-sm flex items-center gap-1">
+                        <Mail className="w-3 h-3" /> {user?.email}
+                    </span>
+                </div>
+              </div>
             </div>
-
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-xl font-bold">Muhammad Daffa Ramdhani</h2>
-                <Badge className="bg-lms-blue text-card">Student</Badge>
-                <Badge variant="outline" className="border-lms-green text-lms-green">Active</Badge>
-              </div>
-              <p className="text-muted-foreground mb-4">Computer Science • Class of 2026</p>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  muhammad.daffa@university.edu
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  +62 812-3456-7890
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  Jakarta, Indonesia
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  Joined September 2023
-                </div>
-              </div>
+            
+            <div className="flex gap-3 mt-2">
+              <Badge variant="outline" className="px-3 py-1">
+                <BookOpen className="w-3 h-3 mr-2" /> {enrolledCourses.length} Kursus
+              </Badge>
             </div>
           </div>
         </Card>
 
-        <Tabs defaultValue="overview">
-          <TabsList className="mb-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="courses">Courses</TabsTrigger>
-            <TabsTrigger value="achievements">Achievements</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+        <Tabs defaultValue="settings" className="w-full">
+          <TabsList className="w-full justify-start mb-6 bg-transparent border-b rounded-none p-0 h-auto">
+            <TabsTrigger value="settings" className="rounded-none border-b-2 border-transparent data-[state=active]:border-lms-blue data-[state=active]:bg-transparent px-4 py-2">
+              Pengaturan Profil
+            </TabsTrigger>
+            <TabsTrigger value="courses" className="rounded-none border-b-2 border-transparent data-[state=active]:border-lms-blue data-[state=active]:bg-transparent px-4 py-2">
+              Daftar Kursus
+            </TabsTrigger>
+            {/* Tab Penghargaan DIHAPUS */}
           </TabsList>
 
-          <TabsContent value="overview">
-            <div className="grid grid-cols-2 gap-6">
-              <Card className="p-6">
-                <h3 className="font-semibold mb-4">Academic Progress</h3>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Overall GPA</span>
-                      <span className="font-medium">3.85 / 4.00</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: "96%" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Course Completion</span>
-                      <span className="font-medium">58%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-lms-blue rounded-full" style={{ width: "58%" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Assignment Success Rate</span>
-                      <span className="font-medium">92%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-lms-green rounded-full" style={{ width: "92%" }} />
-                    </div>
-                  </div>
+          {/* Tab Settings */}
+          <TabsContent value="settings" className="mt-0">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Edit Profil</CardTitle>
+                  <CardDescription>Perbarui informasi pribadi Anda.</CardDescription>
                 </div>
-              </Card>
-
-              <Card className="p-6">
-                <h3 className="font-semibold mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                  {recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <span className={`w-2 h-2 rounded-full mt-2 ${activity.color}`} />
-                      <div>
-                        <p className="font-medium">{activity.action}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {activity.course} • {activity.time}
-                        </p>
+                {!isEditing && (
+                  <Button variant="outline" onClick={() => setIsEditing(true)}>
+                    <Pencil className="w-4 h-4 mr-2" /> Edit Data
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <fieldset disabled={!isEditing} className="space-y-4 group">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Nama Depan</Label>
+                        <Input 
+                          value={formData.first_name} 
+                          onChange={(e) => setFormData({...formData, first_name: e.target.value})} 
+                          className="disabled:opacity-100 disabled:bg-muted/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Nama Belakang</Label>
+                        <Input 
+                          value={formData.last_name} 
+                          onChange={(e) => setFormData({...formData, last_name: e.target.value})} 
+                          className="disabled:opacity-100 disabled:bg-muted/50"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input 
+                        value={formData.email} 
+                        onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                        className="disabled:opacity-100 disabled:bg-muted/50"
+                      />
+                    </div>
+
+                    {isEditing && (
+                        <div className="space-y-2 pt-4 border-t">
+                            <Label>Ganti Password (Opsional)</Label>
+                            <Input 
+                            type="password" 
+                            placeholder="Kosongkan jika tidak ingin mengubah"
+                            value={formData.password}
+                            onChange={(e) => setFormData({...formData, password: e.target.value})}
+                            />
+                        </div>
+                    )}
+                  </fieldset>
+
+                  {isEditing && (
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button type="button" variant="ghost" onClick={() => setIsEditing(false)}>Batal</Button>
+                      <Button type="submit" disabled={isLoading} className="bg-lms-blue hover:bg-blue-700">
+                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Simpan Perubahan
+                      </Button>
+                    </div>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab Courses */}
+          <TabsContent value="courses" className="mt-0">
+            {enrolledCourses.length === 0 ? (
+              <Card className="p-8 text-center text-muted-foreground bg-muted/30 border-dashed">
+                <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                <p>Belum ada kursus.</p>
               </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="courses">
-            <Card className="p-6">
-              <p className="text-muted-foreground">View all your enrolled courses and track your progress.</p>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="achievements">
-            <Card className="p-6">
-              <p className="text-muted-foreground">Your achievements and badges will appear here.</p>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Card className="p-6">
-              <p className="text-muted-foreground">Account settings and preferences.</p>
-            </Card>
+            ) : (
+              <div className="grid gap-4">
+                {enrolledCourses.map(course => (
+                  <Card key={course.id} className="flex items-center p-4 gap-4 hover:bg-accent/50 transition-colors">
+                    <div className="w-12 h-12 bg-lms-blue/10 text-lms-blue rounded-lg flex items-center justify-center overflow-hidden">
+                      {course.image ? (
+                        <img src={course.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen className="w-6 h-6" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold">{course.name}</h3>
+                      <p className="text-sm text-muted-foreground">{course.code}</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">Lihat</Button>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

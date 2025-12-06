@@ -1,209 +1,191 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Star, Users, FileText, Video, Clock } from "lucide-react";
-
-const courses = [
-  {
-    id: 1,
-    title: "Software Engineering",
-    code: "CS301",
-    instructor: "Dr. Sarah Johnson",
-    rating: 4.8,
-    students: 42,
-    description: "Learn modern software development practices and methodologies.",
-    progress: 75,
-    materials: 45,
-    assignments: 12,
-    duration: "16 weeks",
-    nextClass: "Monday, 10:00 AM",
-    status: "ongoing",
-    color: "bg-lms-blue",
-  },
-  {
-    id: 2,
-    title: "Data Structures & Algorithms",
-    code: "CS202",
-    instructor: "Prof. Michael Chen",
-    rating: 4.9,
-    students: 38,
-    description: "Master fundamental data structures and algorithm design techniques.",
-    progress: 60,
-    materials: 52,
-    assignments: 15,
-    duration: "16 weeks",
-    nextClass: "Tuesday, 2:00 PM",
-    status: "ongoing",
-    color: "bg-lms-orange",
-  },
-  {
-    id: 3,
-    title: "Database Systems",
-    code: "CS305",
-    instructor: "Dr. Emily Davis",
-    rating: 4.7,
-    students: 35,
-    description: "Comprehensive study of database design, SQL, and NoSQL systems.",
-    progress: 82,
-    materials: 38,
-    assignments: 10,
-    duration: "16 weeks",
-    nextClass: "Wednesday, 9:00 AM",
-    status: "ongoing",
-    color: "bg-lms-green",
-  },
-  {
-    id: 4,
-    title: "Machine Learning",
-    code: "CS401",
-    instructor: "Dr. James Wilson",
-    rating: 4.9,
-    students: 30,
-    description: "Introduction to machine learning algorithms and applications.",
-    progress: 45,
-    materials: 60,
-    assignments: 18,
-    duration: "16 weeks",
-    nextClass: "Thursday, 1:00 PM",
-    status: "ongoing",
-    color: "bg-lms-purple",
-  },
-  {
-    id: 5,
-    title: "Web Development",
-    code: "CS250",
-    instructor: "Prof. Lisa Anderson",
-    rating: 4.8,
-    students: 45,
-    description: "Full-stack web development with modern frameworks and tools.",
-    progress: 90,
-    materials: 42,
-    assignments: 14,
-    duration: "16 weeks",
-    nextClass: "Friday, 11:00 AM",
-    status: "ongoing",
-    color: "bg-lms-coral",
-  },
-  {
-    id: 6,
-    title: "Computer Networks",
-    code: "CS310",
-    instructor: "Dr. Robert Taylor",
-    rating: 4.6,
-    students: 40,
-    description: "Study of network protocols, architecture, and security.",
-    progress: 100,
-    materials: 35,
-    assignments: 8,
-    duration: "16 weeks",
-    nextClass: "Completed",
-    status: "completed",
-    color: "bg-lms-green",
-  },
-];
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { courseService, Course as CourseType } from "@/services/courseService";
+import { authService } from "@/services/authService";
+import { Users, BookOpen, Plus, Pencil, Trash2, Loader2, Search } from "lucide-react";
 
 export default function Courses() {
-  const [filter, setFilter] = useState("all");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const [courses, setCourses] = useState<CourseType[]>([]);
+  const [allCourses, setAllCourses] = useState<CourseType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  
+  // Form
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({ name: "", code: "", description: "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  const filteredCourses = courses.filter((course) => {
-    if (filter === "all") return true;
-    return course.status === filter;
-  });
+  const user = authService.getUser();
+  // ATURAN: Hanya Admin yang boleh CRUD Course
+  const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery) {
+        setCourses(allCourses);
+    } else {
+        const lower = searchQuery.toLowerCase();
+        const filtered = allCourses.filter(c => 
+            c.name.toLowerCase().includes(lower) || 
+            c.code.toLowerCase().includes(lower) ||
+            c.description.toLowerCase().includes(lower)
+        );
+        setCourses(filtered);
+    }
+  }, [searchQuery, allCourses]);
+
+  const fetchCourses = async () => {
+    try {
+      setIsLoading(true);
+      const data = await courseService.getAll();
+      // @ts-ignore
+      const list = Array.isArray(data) ? data : data.results || [];
+      setAllCourses(list);
+      setCourses(list);
+    } catch (error) {
+      console.error("Failed to fetch courses", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('code', formData.code);
+      data.append('description', formData.description);
+      if (imageFile) data.append('image', imageFile);
+
+      if (editingId) {
+        await courseService.update(editingId, data);
+        toast({ title: "Sukses", description: "Kursus diperbarui" });
+      } else {
+        await courseService.create(data);
+        toast({ title: "Sukses", description: "Kursus dibuat" });
+      }
+      setIsDialogOpen(false);
+      fetchCourses();
+    } catch (error) {
+      toast({ title: "Gagal", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Hapus kursus ini?")) return;
+    try {
+        await courseService.delete(id);
+        fetchCourses();
+        toast({ title: "Terhapus" });
+    } catch {
+        toast({ title: "Gagal hapus", variant: "destructive" });
+    }
+  };
+
+  const openEdit = (course: CourseType) => {
+    setEditingId(course.id);
+    setFormData({ name: course.name, code: course.code, description: course.description });
+    setIsDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({ name: "", code: "", description: "" });
+    setImageFile(null);
+  };
 
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto animate-fade-in">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">My Courses</h1>
-          <p className="text-muted-foreground">Manage and track your enrolled courses</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Daftar Kursus</h1>
+            <p className="text-muted-foreground">Lihat materi dan modul pembelajaran.</p>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Cari kursus..." 
+                    className="pl-9 bg-background"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
+            {/* Tombol Tambah Hanya Muncul untuk Admin */}
+            {isAdmin && (
+                <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if(!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                    <Button className="bg-lms-blue hover:bg-blue-700 whitespace-nowrap">
+                    <Plus className="w-4 h-4 mr-2" /> Tambah
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>{editingId ? "Edit" : "Tambah"} Kursus</DialogTitle></DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                        <Input placeholder="Kode (CS101)" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} required />
+                        <Input placeholder="Nama Kursus" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                        <Textarea placeholder="Deskripsi" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
+                        <Input type="file" onChange={e => setImageFile(e.target.files?.[0] || null)} />
+                        <DialogFooter><Button type="submit" disabled={isSubmitting}>Simpan</Button></DialogFooter>
+                    </form>
+                </DialogContent>
+                </Dialog>
+            )}
+          </div>
         </div>
 
-        <Tabs defaultValue="all" className="mb-6" onValueChange={setFilter}>
-          <TabsList>
-            <TabsTrigger value="all">All Courses</TabsTrigger>
-            <TabsTrigger value="ongoing">Ongoing</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredCourses.map((course) => (
-            <Card key={course.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-xl ${course.color}`}>
-                    <svg className="h-6 w-6 text-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg">{course.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {course.code} • {course.instructor}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 text-sm">
-                      <Star className="h-4 w-4 fill-lms-yellow text-lms-yellow" />
-                      <span>{course.rating}</span>
-                      <span className="text-muted-foreground">•</span>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{course.students} students</span>
+        {/* Content Grid */}
+        {isLoading ? <div className="flex justify-center py-12"><Loader2 className="animate-spin"/></div> : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courses.map((course) => (
+                <Card key={course.id} className="flex flex-col hover:shadow-lg transition-shadow overflow-hidden cursor-pointer border-border/50" onClick={() => navigate(`/courses/${course.id}`)}>
+                    <div className="h-40 bg-muted relative">
+                        {course.image ? <img src={course.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-lms-blue/10"><BookOpen className="w-12 h-12 text-lms-blue/40"/></div>}
+                        <Badge className="absolute top-4 right-4 bg-white/90 text-black">{course.code}</Badge>
                     </div>
-                  </div>
-                </div>
-                <Badge variant={course.status === "completed" ? "default" : "secondary"} 
-                       className={course.status === "completed" ? "bg-lms-green" : "bg-lms-blue text-card"}>
-                  {course.status}
-                </Badge>
-              </div>
-
-              <p className="text-sm text-muted-foreground mb-4">{course.description}</p>
-
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Course Progress</span>
-                  <span className="font-medium">{course.progress}%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${course.color}`}
-                    style={{ width: `${course.progress}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 py-4 border-y border-border">
-                <div className="text-center">
-                  <FileText className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">{course.materials}</p>
-                  <p className="text-xs text-muted-foreground">Materials</p>
-                </div>
-                <div className="text-center">
-                  <Video className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">{course.assignments}</p>
-                  <p className="text-xs text-muted-foreground">Assignments</p>
-                </div>
-                <div className="text-center">
-                  <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-semibold">{course.duration}</p>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  Next class: <span className="font-medium text-foreground">{course.nextClass}</span>
-                </p>
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Enter Course
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+                    <CardHeader>
+                        <CardTitle className="line-clamp-1 text-lg">{course.name}</CardTitle>
+                        <CardDescription className="flex items-center gap-1 mt-1 text-xs"><Users className="w-3 h-3" /> {course.lecturer_detail?.first_name ? `Dr. ${course.lecturer_detail.first_name}` : 'Dosen'}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1"><p className="text-sm text-muted-foreground line-clamp-2">{course.description}</p></CardContent>
+                    <CardFooter className="border-t pt-4 flex justify-between items-center bg-muted/10">
+                        <Button variant="outline" size="sm" onClick={(e) => {e.stopPropagation(); navigate(`/courses/${course.id}`)}}>Detail</Button>
+                        {/* Tombol Edit/Hapus Hanya untuk Admin */}
+                        {isAdmin && (
+                            <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); openEdit(course)}}><Pencil className="w-3 h-3 text-blue-600" /></Button>
+                                <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); handleDelete(course.id)}}><Trash2 className="w-3 h-3 text-red-600" /></Button>
+                            </div>
+                        )}
+                    </CardFooter>
+                </Card>
+                ))}
+            </div>
+        )}
       </div>
     </MainLayout>
   );
