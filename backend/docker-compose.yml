@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: eduplatform_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=eduplatform
+      - POSTGRES_USER=eduplatform
+      - POSTGRES_PASSWORD=eduplatform123
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eduplatform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: eduplatform_backend
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_data &&
+             python manage.py collectstatic --noinput &&
+             gunicorn eduplatform.wsgi:application --bind 0.0.0.0:8000 --reload"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - DB_NAME=eduplatform
+      - DB_USER=eduplatform
+      - DB_PASSWORD=eduplatform123
+      - DB_HOST=db
+      - DB_PORT=5432
+      - SECRET_KEY=django-insecure-dev-key-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - CORS_ALLOW_ALL_ORIGINS=True
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/schema/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

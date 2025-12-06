@@ -1,0 +1,40 @@
+# Django
+*.pyc
+__pycache__/
+*.log
+*.pot
+*.py[cod]
+*$py.class
+db.sqlite3
+db.sqlite3-journal
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Static and Media files
+/staticfiles/
+/media/
+
+# Environment variables
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing & Documentation
+API_TESTING.md
+THUNDER_CLIENT_GUIDE.md
+test_api.py
+thunder-collection*.json
+thunder-environment*.json
