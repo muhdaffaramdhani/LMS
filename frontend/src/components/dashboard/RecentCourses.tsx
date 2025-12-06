@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Users, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { courseService, Course } from "@/services/courseService";
@@ -11,12 +11,11 @@ export function RecentCourses() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Mengambil data terbaru
     courseService.getAll()
       .then(data => {
         // @ts-ignore
         const list = Array.isArray(data) ? data : (data.results || []);
-        setCourses(list.slice(0, 3)); // Tampilkan 3 teratas
+        setCourses(list.slice(0, 3)); // Show top 3
       })
       .catch(err => console.error(err))
       .finally(() => setIsLoading(false));
@@ -35,9 +34,9 @@ export function RecentCourses() {
   return (
     <Card className="p-6 h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Kursus Terbaru</h3>
+        <h3 className="text-lg font-semibold">Recent Courses</h3>
         <Link to="/courses" className="text-sm text-muted-foreground hover:text-lms-blue">
-          Lihat Semua
+          View All
         </Link>
       </div>
 
@@ -45,13 +44,13 @@ export function RecentCourses() {
         {courses.length === 0 ? (
           <div className="text-center py-8 bg-muted/30 rounded-lg border border-dashed">
              <BookOpen className="w-8 h-8 mx-auto text-muted-foreground mb-2 opacity-50" />
-             <p className="text-sm text-muted-foreground">Belum ada kursus.</p>
+             <p className="text-sm text-muted-foreground">No courses available.</p>
           </div>
         ) : (
           courses.map((course) => (
             <div
               key={course.id}
-              onClick={() => navigate(`/courses/${course.id}`)} // Klik untuk ke detail
+              onClick={() => navigate(`/courses/${course.id}`)}
               className="p-3 rounded-lg border border-border hover:border-lms-blue hover:bg-accent/40 transition-all cursor-pointer group"
             >
               <div className="flex items-start gap-3">
@@ -63,7 +62,7 @@ export function RecentCourses() {
                   <p className="text-xs text-muted-foreground">
                     {course.lecturer_detail?.first_name 
                       ? `Dr. ${course.lecturer_detail.first_name} ${course.lecturer_detail.last_name}` 
-                      : "Dosen Pengampu"}
+                      : "Instructor"}
                   </p>
                 </div>
               </div>

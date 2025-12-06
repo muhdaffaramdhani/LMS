@@ -7,16 +7,19 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { icon: Home, label: "Dashboard", path: "/" },
-  { icon: BookOpen, label: "Kursus", path: "/courses" },
-  { icon: CheckSquare, label: "Tugas", path: "/tasks" },
-  // Laporan dihapus
-  { icon: User, label: "Profil", path: "/profile" },
+  { icon: BookOpen, label: "Courses", path: "/courses" },
+  { icon: CheckSquare, label: "Tasks", path: "/tasks" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const user = authService.getUser();
-  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "U";
+  
+  // LOGIC NAMA: Prioritas First Name
+  const displayName = user?.first_name || user?.username || "User";
+  const displayRole = user?.role || "";
+  const initials = displayName.substring(0, 2).toUpperCase();
 
   return (
     <aside className="fixed top-0 left-0 z-40 flex flex-col w-56 h-screen bg-sidebar text-sidebar-foreground">
@@ -54,8 +57,8 @@ export function Sidebar() {
             <AvatarFallback className="text-sidebar-foreground bg-sidebar-accent">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{user?.username || "User"}</p>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role || "Student"}</p>
+            <p className="text-sm font-medium truncate capitalize">{displayName}</p>
+            <p className="text-xs text-sidebar-foreground/60 capitalize">{displayRole}</p>
           </div>
         </div>
         
@@ -65,7 +68,7 @@ export function Sidebar() {
           onClick={() => authService.logout()}
         >
           <LogOut className="w-5 h-5 mr-3" />
-          Keluar
+          Logout
         </Button>
       </div>
     </aside>

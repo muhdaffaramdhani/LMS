@@ -5,26 +5,25 @@ import { Link } from "react-router-dom";
 const actions = [
   {
     icon: FileText,
-    label: "Materi",
-    description: "Jelajahi materi pembelajaran",
+    label: "View Courses", // Changed from "Materi"
+    description: "Browse your learning materials",
     color: "bg-lms-blue",
     href: "/courses",
   },
   {
     icon: CheckCircle,
-    label: "Tugas",
-    description: "Lihat daftar tugas",
+    label: "View Tasks",
+    description: "Check pending assignments",
     color: "bg-lms-green",
     href: "/tasks",
   },
-  // Item Diskusi dihapus sesuai permintaan
 ];
 
 export function QuickActions() {
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-4">Aksi Cepat</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Ubah grid jadi 2 kolom */}
+      <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {actions.map((action) => (
           <Link key={action.label} to={action.href}>
             <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer group">

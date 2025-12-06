@@ -6,19 +6,15 @@ from users.serializers import UserSerializer
 class CourseSerializer(serializers.ModelSerializer):
     """Serializer untuk Course model"""
     lecturer_detail = UserSerializer(source='lecturer', read_only=True)
+    students_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Course
-        # Tambahkan 'image' ke dalam fields
-        fields = ['id', 'name', 'code', 'description', 'image', 'lecturer', 'lecturer_detail', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'lecturer']
+        fields = ['id', 'name', 'code', 'description', 'image', 'duration_weeks', 'lecturer', 'lecturer_detail', 'students_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'lecturer_detail', 'students_count']
         
-    def create(self, validated_data):
-        # Otomatis set lecturer dari user yang sedang login
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            validated_data['lecturer'] = request.user
-        return super().create(validated_data)
+    def get_students_count(self, obj):
+        return obj.enrollments.count()
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):

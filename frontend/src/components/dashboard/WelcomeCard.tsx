@@ -1,24 +1,21 @@
 import { Card } from "@/components/ui/card";
 import { authService } from "@/services/authService";
-import { assignmentService } from "@/services/assignmentService"; // Import service assignment
+import { assignmentService } from "@/services/assignmentService"; 
 import { useState, useEffect } from "react";
 
 export function WelcomeCard() {
   const [user, setUser] = useState(authService.getUser());
-  const [progress, setProgress] = useState(0); // Default 0, bukan dummy lagi
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Fungsi untuk handle update user (login/logout/edit profile)
     const handleAuthChange = () => {
       setUser(authService.getUser());
     };
 
-    // Fungsi untuk menghitung progress real
     const calculateProgress = async () => {
       try {
-        // 1. Ambil semua tugas dari API
         const data = await assignmentService.getAll();
-        // @ts-ignore (Handle pagination response structure if any)
+        // @ts-ignore
         const tasks = Array.isArray(data) ? data : (data.results || []);
 
         if (tasks.length === 0) {
@@ -26,33 +23,24 @@ export function WelcomeCard() {
           return;
         }
 
-        // 2. Ambil status pengerjaan dari LocalStorage 
-        // (Data ini sinkron dengan halaman Tasks)
         const savedStatuses = localStorage.getItem('taskStatuses');
         const taskStatuses = savedStatuses ? JSON.parse(savedStatuses) : {};
 
-        // 3. Hitung berapa tugas yang statusnya 'completed'
         const completedCount = tasks.filter((task: any) => taskStatuses[task.id] === 'completed').length;
         
-        // 4. Hitung persentase
         const percentage = Math.round((completedCount / tasks.length) * 100);
         setProgress(percentage);
         
       } catch (error) {
-        console.error("Gagal menghitung progress:", error);
+        console.error("Failed to calculate progress:", error);
         setProgress(0);
       }
     };
 
-    // Panggil perhitungan saat komponen dimuat
     calculateProgress();
     
-    // Listeners
     window.addEventListener('storage', handleAuthChange);
     window.addEventListener('auth-update', handleAuthChange);
-    // Kita bisa tambahkan listener 'storage' untuk update progress real-time antar tab,
-    // tapi calculateProgress juga perlu dipanggil jika user mengubah task di tab yang sama.
-    // Untuk kesederhanaan, progress akan terupdate setiap kali halaman di-refresh atau komponen dimuat ulang.
     
     return () => {
       window.removeEventListener('storage', handleAuthChange);
@@ -70,12 +58,12 @@ export function WelcomeCard() {
             Hi {displayName} 👋
           </h2>
           <p className="text-primary-foreground/80 mb-6">
-            Selamat datang kembali! Tetap semangat belajar semester ini.
+            Welcome back! Keep up the good work this semester.
           </p>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm">Progress Penyelesaian Tugas</span>
+              <span className="text-sm">Task Completion Progress</span>
               <span className="text-sm font-medium">{progress}%</span>
             </div>
             <div className="h-2.5 bg-primary-foreground/20 rounded-full overflow-hidden">

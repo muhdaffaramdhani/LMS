@@ -33,7 +33,7 @@ export interface UserData {
 }
 
 export const authService = {
-  // LOGIN: Get Token -> Lalu Get User Profile
+  // LOGIN: Get Token -> Lalu Get User Profile (/users/me/)
   login: async (data: LoginInput) => {
     // 1. Dapat token dulu
     const response = await api.post<TokenResponse>('/token/', data);
@@ -42,22 +42,23 @@ export const authService = {
       localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access);
       localStorage.setItem(REFRESH_TOKEN_KEY, response.data.refresh);
       
-      // 2. Ambil data user asli dari backend
+      // 2. Ambil data user asli dari endpoint /users/me/
       try {
-        // Kita cari user berdasarkan username yang diinput
-        const usersResponse = await api.get<UserData[]>('/users/');
-        // Filter manual (karena backend /users/ mengembalikan list semua user)
-        const currentUser = usersResponse.data.find(u => u.username === data.username);
-
-        if (currentUser) {
-           localStorage.setItem(USER_DATA_KEY, JSON.stringify(currentUser));
-        } else {
-           // Fallback jika gagal (jarang terjadi)
-           const dummyUser = { username: data.username, role: 'student', id: 0 };
-           localStorage.setItem(USER_DATA_KEY, JSON.stringify(dummyUser));
-        }
+        const userResponse = await api.get<UserData>('/users/me/');
+        
+        // Simpan data user yang akurat ke localStorage
+        localStorage.setItem(USER_DATA_KEY, JSON.stringify(userResponse.data));
+        
       } catch (error) {
-        console.error("Gagal mengambil profil user:", error);
+        console.error("Failed to fetch user profile:", error);
+        // Fallback hanya jika request gagal total (jarang terjadi)
+        const dummyUser = { 
+          username: data.username, 
+          role: 'student', 
+          id: 0, 
+          first_name: data.username 
+        };
+        localStorage.setItem(USER_DATA_KEY, JSON.stringify(dummyUser));
       }
     }
     return response.data;
@@ -87,7 +88,6 @@ export const authService = {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_DATA_KEY);
-    // Clear juga status tugas lokal
     localStorage.removeItem('taskStatuses');
     window.location.href = '/login';
   },
@@ -106,7 +106,9 @@ export const authService = {
     }
   },
 
-  setUserData: (data: UserData) => {
-    localStorage.setItem(USER_DATA_KEY, JSON.stringify(data));
+  // Helper untuk Admin: Ambil semua user
+  getAllUsers: async () => {
+    const response = await api.get('/users/');
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   }
 };

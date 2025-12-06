@@ -16,17 +16,18 @@ export function Header() {
     return () => window.removeEventListener('auth-update', handleAuthUpdate);
   }, []);
 
-  // Name Logic: Priority First Name -> Username
-  const displayName = (user?.first_name && user?.last_name) 
-    ? `${user.first_name} ${user.last_name}` 
-    : (user?.first_name || user?.username || "User");
+  // LOGIC NAMA: Ambil dari First Name. Jika kosong, gunakan Username.
+  const displayName = user?.first_name || user?.username || "User";
 
-  const displayRole = user?.role || "Guest";
+  // LOGIC ROLE: Langsung dari database (admin, lecturer, student).
+  // Jika null (belum login/error), fallback ke string kosong agar tidak misleading.
+  const displayRole = user?.role || "";
+  
   const initial = displayName.charAt(0).toUpperCase();
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      navigate(`/courses?search=${searchQuery}`);
+      navigate(`/courses?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -38,7 +39,7 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search courses..." 
-            className="pl-10 bg-muted/50 border-0" 
+            className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-lms-blue" 
             value={searchQuery} 
             onChange={e => setSearchQuery(e.target.value)} 
             onKeyDown={handleSearch}
@@ -46,15 +47,13 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Notification Removed */}
-
           {/* User Profile */}
           <div className="flex items-center gap-3 text-right">
             <div className="hidden md:block">
               <p className="text-sm font-medium capitalize">{displayName}</p>
               <p className="text-xs text-muted-foreground capitalize">{displayRole}</p>
             </div>
-            <Avatar className="h-9 w-9 border border-border cursor-pointer" onClick={() => navigate('/profile')}>
+            <Avatar className="h-9 w-9 border border-border cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/profile')}>
               <AvatarFallback className="bg-lms-blue text-white">{initial}</AvatarFallback>
             </Avatar>
           </div>

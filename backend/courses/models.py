@@ -7,8 +7,9 @@ class Course(models.Model):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=50, unique=True)
     description = models.TextField()
-    # Tambahkan field image untuk upload foto
     image = models.ImageField(upload_to='courses/', null=True, blank=True)
+    # Field baru untuk durasi minggu
+    duration_weeks = models.PositiveIntegerField(default=12, help_text="Duration in weeks")
     
     lecturer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
