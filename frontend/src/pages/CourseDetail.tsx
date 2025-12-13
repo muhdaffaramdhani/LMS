@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { courseService, Course } from "@/services/courseService";
-import { assignmentService, Assignment } from "@/services/assignmentService";
-import { authService, UserData } from "@/services/authService";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Users, BookOpen, Calendar, Clock, FileText, CheckCircle2, Plus, Loader2, Trash2 } from "lucide-react";
+import { MainLayout } from "../components/layout/MainLayout";
+import { courseService, Course } from "../services/courseService";
+import { assignmentService, Assignment } from "../services/assignmentService";
+import { authService, UserData } from "../services/authService";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useToast } from "../hooks/use-toast";
+import { ArrowLeft, Users, BookOpen, Clock, FileText, CheckCircle2, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import api from "@/lib/axios";
+import api from "../lib/axios";
 
 export default function CourseDetail() {
   const { id } = useParams();
@@ -25,10 +25,12 @@ export default function CourseDetail() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isEnrolled, setIsEnrolled] = useState(false);
-  const [enrolledStudents, setEnrolledStudents] = useState<any[]>([]); // List siswa yang sudah enroll
-  const [allStudents, setAllStudents] = useState<UserData[]>([]); // Semua siswa di database
+  const [enrolledStudents, setEnrolledStudents] = useState<any[]>([]); 
+  const [allStudents, setAllStudents] = useState<UserData[]>([]); 
   const [selectedStudent, setSelectedStudent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isEnrollLoading, setIsEnrollLoading] = useState(false);
+  const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
   const user = authService.getUser();
@@ -48,11 +50,9 @@ export default function CourseDetail() {
 
   const fetchCourseData = async () => {
     try {
-      // 1. Fetch Course Detail
       const courseData = await courseService.getById(id!);
       setCourse(courseData);
 
-      // 2. Fetch Materials & Assignments (Safe Fetching)
       try {
         const matsResponse = await api.get(`/materials/?course=${id}`);
         const matsData = matsResponse.data;
@@ -81,12 +81,10 @@ export default function CourseDetail() {
 
   const fetchStudentsData = async () => {
     try {
-      // 1. Ambil semua enrollment khusus untuk course ini
       const enrollResponse = await api.get(`/enrollments/?course=${id}`);
       const enrollList = Array.isArray(enrollResponse.data) ? enrollResponse.data : (enrollResponse.data.results || []);
       setEnrolledStudents(enrollList);
 
-      // 2. Ambil semua user role 'student' dari database
       const users = await authService.getAllUsers();
       if (Array.isArray(users)) {
         setAllStudents(users.filter((u: UserData) => u.role === 'student'));
@@ -96,7 +94,6 @@ export default function CourseDetail() {
     }
   };
 
-  // Filter: Mahasiswa yang BELUM enroll
   const availableStudents = allStudents.filter(student => 
     !enrolledStudents.some(enrolled => enrolled.student === student.id)
   );
@@ -127,18 +124,23 @@ export default function CourseDetail() {
 
   const handleAdminEnroll = async () => {
     if (!id || !selectedStudent) return;
+    
+    setIsEnrollLoading(true);
     try {
       await courseService.enrollStudent(parseInt(id), parseInt(selectedStudent));
       toast({ title: "Success", description: "Student enrolled successfully." });
       setSelectedStudent("");
-      fetchCourseData(); 
-      fetchStudentsData(); // Refresh list mahasiswa
+      setIsEnrollDialogOpen(false); 
+      
+      await fetchStudentsData(); 
+      await fetchCourseData();
     } catch (error) {
       toast({ title: "Error", description: "Failed to enroll student.", variant: "destructive" });
+    } finally {
+      setIsEnrollLoading(false);
     }
   };
 
-  // Loading State
   if (isLoading) return (
     <div className="flex justify-center items-center h-screen">
       <Loader2 className="animate-spin w-8 h-8 text-lms-blue" />
@@ -256,7 +258,7 @@ export default function CourseDetail() {
                   )}
                 </TabsContent>
 
-                {/* TAB STUDENTS (NEW) */}
+                {/* TAB STUDENTS (Admin/Lecturer Only) */}
                 {(isAdmin || isLecturer) && (
                   <TabsContent value="students" className="mt-4 animate-in fade-in-50">
                     <div className="space-y-3">
@@ -299,7 +301,7 @@ export default function CourseDetail() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Lecturer (Dosen)</CardTitle>
+                <CardTitle className="text-base">Lecturer</CardTitle> 
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3">
@@ -327,11 +329,11 @@ export default function CourseDetail() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" /> Students Enrolled
                   </div>
-                  <span className="font-medium">{course.students_count || 0}</span>
+                  <span className="font-medium">{course.students_count || enrolledStudents.length || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" /> Duration
+                    <Clock className="w-4 h-4" /> Duration
                   </div>
                   <span className="font-medium">{course.duration_weeks || 12} Weeks</span>
                 </div>
@@ -352,7 +354,7 @@ export default function CourseDetail() {
             )}
 
             {isAdmin && (
-              <Dialog>
+              <Dialog open={isEnrollDialogOpen} onOpenChange={setIsEnrollDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full">
                     <Plus className="w-4 h-4 mr-2" /> Enroll Student (Admin)
@@ -364,24 +366,35 @@ export default function CourseDetail() {
                   </DialogHeader>
                   <div className="py-4">
                     {availableStudents.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center">All students are already enrolled.</p>
+                      <div className="text-center p-4 bg-muted/30 rounded">
+                        <p className="text-sm text-muted-foreground">All students are already enrolled.</p>
+                      </div>
                     ) : (
-                      <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Student to Enroll" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableStudents.map(s => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.first_name} {s.last_name} ({s.username})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Student</label>
+                        <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Student to Enroll" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableStudents.map(s => (
+                              <SelectItem key={s.id} value={s.id.toString()}>
+                                {s.first_name} {s.last_name} ({s.username})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     )}
                   </div>
                   <DialogFooter>
-                    <Button onClick={handleAdminEnroll} disabled={!selectedStudent}>Enroll Student</Button>
+                    <Button 
+                      onClick={handleAdminEnroll} 
+                      disabled={!selectedStudent || isEnrollLoading}
+                    >
+                      {isEnrollLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Enroll Student
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>

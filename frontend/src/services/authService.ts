@@ -106,9 +106,10 @@ export const authService = {
     }
   },
 
-  // Helper untuk Admin: Ambil semua user
+  // Helper untuk Admin: Ambil semua user tanpa pagination
   getAllUsers: async () => {
-    const response = await api.get('/users/');
+    // Tambahkan ?all=true agar backend mengirim semua data tanpa terpotong page
+    const response = await api.get('/users/?all=true');
     return Array.isArray(response.data) ? response.data : (response.data.results || []);
   }
 };

@@ -27,13 +27,29 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     queryset = Enrollment.objects.all()
     serializer_class = EnrollmentSerializer
     
+    def get_queryset(self):
+        """
+        Filter enrollment berdasarkan query parameter.
+        Contoh: /api/enrollments/?course=1
+        """
+        queryset = Enrollment.objects.all()
+        course_id = self.request.query_params.get('course')
+        student_id = self.request.query_params.get('student')
+        
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        if student_id:
+            queryset = queryset.filter(student_id=student_id)
+            
+        return queryset
+    
     def get_permissions(self):
         # List and retrieve - authenticated users
         if self.action in ['list', 'retrieve']:
             return [IsAuthenticated()]
-        # Create - students can enroll themselves
+        # Create - students can enroll themselves, or admin/lecturer can enroll others
         elif self.action == 'create':
-            return [IsStudent()]
+            return [IsAuthenticated()] 
         # Update and delete - lecturer or admin
         else:
             return [IsLecturerOrAdmin()]

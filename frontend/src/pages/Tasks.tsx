@@ -1,20 +1,33 @@
 import { useState, useEffect } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { assignmentService, Assignment } from "@/services/assignmentService";
-import { courseService, Course } from "@/services/courseService";
-import { authService } from "@/services/authService";
-import { Calendar, Clock, Plus, Trash2, Pencil, AlertCircle, Loader2, CheckCircle2, PlayCircle, Timer, Search } from "lucide-react";
+// Menggunakan path yang lebih eksplisit untuk menghindari error resolusi
+import { MainLayout } from "../../src/components/layout/MainLayout";
+import { Card, CardContent } from "../../src/components/ui/card";
+import { Button } from "../../src/components/ui/button";
+import { Input } from "../../src/components/ui/input";
+import { Textarea } from "../../src/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../src/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../src/components/ui/dialog";
+import { Badge } from "../../src/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/tabs";
+import { useToast } from "../../src/hooks/use-toast";
+import { assignmentService, Assignment } from "../../src/services/assignmentService";
+import { courseService, Course } from "../../src/services/courseService";
+import { authService } from "../../src/services/authService";
+import { 
+  Calendar, 
+  Plus, 
+  Trash2, 
+  Pencil, 
+  Loader2, 
+  Search, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle,
+  FileText
+} from "lucide-react";
 import { format } from "date-fns";
 
+// Status type definition
 type TaskStatus = "pending" | "in-progress" | "completed";
 
 export default function Tasks() {
@@ -24,23 +37,21 @@ export default function Tasks() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("all");
+  
+  // Form State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ title: "", description: "", due_date: "", course: "" });
+  
+  // Local State for Student Progress (Simulated)
   const [taskStatuses, setTaskStatuses] = useState<Record<number, TaskStatus>>({});
 
   const user = authService.getUser();
-  
-  // ATURAN HAK AKSES
   const isAdmin = user?.role === 'admin';
   const isLecturer = user?.role === 'lecturer';
-  
-  // Admin: Bisa CRUD (Tambah, Edit, Hapus)
-  // Lecturer: Hanya Bisa TAMBAH
-  // Student: Hanya View & Ubah Status
   const canAdd = isAdmin || isLecturer;
-  const canEditDelete = isAdmin; // Hanya admin yang bisa edit/hapus
 
   useEffect(() => {
     fetchData();
@@ -48,22 +59,29 @@ export default function Tasks() {
     if (saved) setTaskStatuses(JSON.parse(saved));
   }, []);
 
+  // Filter Logic based on Tab and Search
   useEffect(() => {
-    if (!searchQuery) {
-      setFilteredTasks(tasks);
-    } else {
-      const lower = searchQuery.toLowerCase();
-      const filtered = tasks.filter(t => t.title.toLowerCase().includes(lower) || t.description.toLowerCase().includes(lower));
-      setFilteredTasks(filtered);
-    }
-  }, [searchQuery, tasks]);
+    let result = tasks;
 
-  const updateTaskStatus = (taskId: number, status: TaskStatus) => {
-    const newStatuses = { ...taskStatuses, [taskId]: status };
-    setTaskStatuses(newStatuses);
-    localStorage.setItem('taskStatuses', JSON.stringify(newStatuses));
-    toast({ title: "Status Diperbarui" });
-  };
+    // 1. Filter by Search
+    if (searchQuery) {
+      const lower = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.title.toLowerCase().includes(lower) || 
+        t.description.toLowerCase().includes(lower)
+      );
+    }
+
+    // 2. Filter by Tab Status
+    if (activeTab !== "all") {
+      result = result.filter(t => {
+        const status = taskStatuses[t.id] || "pending";
+        return status === activeTab;
+      });
+    }
+
+    setFilteredTasks(result);
+  }, [searchQuery, tasks, activeTab, taskStatuses]);
 
   const fetchData = async () => {
     try {
@@ -73,7 +91,18 @@ export default function Tasks() {
       setTasks(Array.isArray(tasksData) ? tasksData : tasksData.results || []);
       // @ts-ignore
       setCourses(Array.isArray(coursesData) ? coursesData : coursesData.results || []);
-    } catch (error) { console.error(error); } finally { setIsLoading(false); }
+    } catch (error) { 
+      console.error(error); 
+    } finally { 
+      setIsLoading(false); 
+    }
+  };
+
+  const updateTaskStatus = (taskId: number, status: TaskStatus) => {
+    const newStatuses = { ...taskStatuses, [taskId]: status };
+    setTaskStatuses(newStatuses);
+    localStorage.setItem('taskStatuses', JSON.stringify(newStatuses));
+    toast({ title: "Status Updated", description: `Task marked as ${status.replace('-', ' ')}` });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,22 +116,30 @@ export default function Tasks() {
       };
       if (editingId) {
         await assignmentService.update(editingId, payload);
-        toast({ title: "Tugas Diperbarui" });
+        toast({ title: "Task Updated", description: "Changes saved successfully." });
       } else {
         await assignmentService.create(payload);
-        toast({ title: "Tugas Dibuat" });
+        toast({ title: "Task Created", description: "New assignment added." });
       }
       setIsDialogOpen(false);
-      setEditingId(null);
-      setFormData({ title: "", description: "", due_date: "", course: "" });
+      resetForm();
       fetchData();
-    } catch (error) { toast({ title: "Gagal", variant: "destructive" }); } finally { setIsSubmitting(false); }
+    } catch (error) { 
+      toast({ title: "Error", description: "Failed to save task.", variant: "destructive" }); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const handleDelete = async (id: number) => {
-    if(!confirm("Hapus tugas?")) return;
-    await assignmentService.delete(id);
-    fetchData();
+    if(!confirm("Are you sure you want to delete this task?")) return;
+    try {
+        await assignmentService.delete(id);
+        toast({ title: "Task Deleted" });
+        fetchData();
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" });
+    }
   };
 
   const handleEdit = (task: Assignment) => {
@@ -116,32 +153,86 @@ export default function Tasks() {
     setIsDialogOpen(true);
   };
 
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({ title: "", description: "", due_date: "", course: "" });
+  };
+
+  // Helper for Summary Counts
+  const getCount = (status: TaskStatus) => {
+    return tasks.filter(t => (taskStatuses[t.id] || "pending") === status).length;
+  };
+
+  const getPriorityBadge = (id: number) => {
+    const priorities = ["High", "Medium", "Low"];
+    const colors = ["bg-red-100 text-red-700", "bg-orange-100 text-orange-700", "bg-blue-100 text-blue-700"];
+    const index = id % 3;
+    return <Badge variant="outline" className={`text-[10px] px-2 border-0 ${colors[index]}`}>{priorities[index]}</Badge>;
+  };
+
+  const Label = ({ children }: { children: React.ReactNode }) => (
+    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+      {children}
+    </label>
+  );
+
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in">
-        <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
-          <div><h1 className="text-2xl font-bold">Daftar Tugas</h1><p className="text-muted-foreground">Kelola tugas mahasiswa.</p></div>
+      <div className="max-w-6xl mx-auto animate-fade-in pb-10">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
+            <p className="text-muted-foreground mt-1">Track and manage all your assignments and deadlines</p>
+          </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Cari tugas..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Input 
+                placeholder="Search tasks..." 
+                className="pl-9 bg-white" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+              />
             </div>
             
-            {/* Tombol Tambah: Muncul untuk Admin & Lecturer */}
             {canAdd && (
-              <Dialog open={isDialogOpen} onOpenChange={(open) => {setIsDialogOpen(open); if(!open) {setEditingId(null); setFormData({title:"", description:"", due_date:"", course:""})}}}>
-                <DialogTrigger asChild><Button className="bg-lms-orange hover:bg-orange-600 whitespace-nowrap"><Plus className="w-4 h-4 mr-2" /> Buat Tugas</Button></DialogTrigger>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {setIsDialogOpen(open); if(!open) resetForm()}}>
+                <DialogTrigger asChild>
+                    <Button className="bg-gray-900 hover:bg-black text-white">
+                        <Plus className="w-4 h-4 mr-2" /> Create Task
+                    </Button>
+                </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle>{editingId ? "Edit" : "Buat"} Tugas</DialogTitle></DialogHeader>
+                  <DialogHeader>
+                    <DialogTitle>{editingId ? "Edit Task" : "Create New Task"}</DialogTitle>
+                  </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                    <Input placeholder="Judul Tugas" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
-                    <Select value={formData.course} onValueChange={val => setFormData({...formData, course: val})}>
-                        <SelectTrigger><SelectValue placeholder="Pilih Mata Kuliah" /></SelectTrigger>
-                        <SelectContent>{courses.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Input type="datetime-local" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} required />
-                    <Textarea placeholder="Deskripsi" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
-                    <DialogFooter><Button type="submit" disabled={isSubmitting}>Simpan</Button></DialogFooter>
+                    <div className="space-y-2">
+                        <Label>Task Title</Label>
+                        <Input placeholder="e.g. Final Project Report" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Course</Label>
+                        <Select value={formData.course} onValueChange={val => setFormData({...formData, course: val})}>
+                            <SelectTrigger><SelectValue placeholder="Select Course" /></SelectTrigger>
+                            <SelectContent>
+                                {courses.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Due Date</Label>
+                        <Input type="datetime-local" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea placeholder="Task details..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "Save Task"}</Button>
+                    </DialogFooter>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -149,52 +240,159 @@ export default function Tasks() {
           </div>
         </div>
 
-        {/* LIST TUGAS */}
-        <div className="grid gap-4">
-            {filteredTasks.map((task) => {
-                const status = taskStatuses[task.id] || 'pending';
-                return (
-                    <Card key={task.id} className="p-6 hover:shadow-md transition-all border-l-4 border-l-lms-blue">
-                        <div className="flex flex-col md:flex-row gap-4 justify-between">
-                            <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{task.course_detail?.name || 'Umum'}</Badge>
-                                    {/* Status Badge hanya untuk Student */}
-                                    {!canAdd && (
-                                        <Badge variant="outline" className={status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}>
-                                            {status === 'completed' ? 'Selesai' : 'Pending'}
-                                        </Badge>
-                                    )}
-                                </div>
-                                <h3 className="font-bold text-lg">{task.title}</h3>
-                                <p className="text-muted-foreground text-sm">{task.description}</p>
-                                <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
-                                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {format(new Date(task.due_date), "dd MMM yyyy")}</span>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2 min-w-[160px] justify-center">
-                                {/* Student: Ubah Status */}
-                                {!canAdd && (
-                                    <>
-                                        <Button variant={status === 'pending' ? "default" : "outline"} size="sm" onClick={() => updateTaskStatus(task.id, 'pending')}><Timer className="w-4 h-4 mr-2" /> Pending</Button>
-                                        <Button variant={status === 'completed' ? "default" : "outline"} size="sm" onClick={() => updateTaskStatus(task.id, 'completed')}><CheckCircle2 className="w-4 h-4 mr-2" /> Selesai</Button>
-                                    </>
-                                )}
-                                
-                                {/* Admin: Edit/Delete */}
-                                {canEditDelete && (
-                                    <div className="flex gap-2 justify-end">
-                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(task)}><Pencil className="w-4 h-4" /></Button>
-                                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDelete(task.id)}><Trash2 className="w-4 h-4" /></Button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </Card>
-                );
-            })}
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card className="bg-red-50 border-none shadow-sm">
+                <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-red-100 rounded-xl text-red-600">
+                        <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-red-600">Pending</p>
+                        <h3 className="text-2xl font-bold text-gray-900">{getCount('pending')}</h3>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="bg-orange-50 border-none shadow-sm">
+                <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-orange-100 rounded-xl text-orange-600">
+                        <Clock className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-orange-600">In Progress</p>
+                        <h3 className="text-2xl font-bold text-gray-900">{getCount('in-progress')}</h3>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="bg-green-50 border-none shadow-sm">
+                <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-green-100 rounded-xl text-green-600">
+                        <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-green-600">Completed</p>
+                        <h3 className="text-2xl font-bold text-gray-900">{getCount('completed')}</h3>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
+
+        {/* Tabs & List */}
+        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-6 bg-transparent p-0 gap-6 h-auto border-b border-gray-200 w-full justify-start rounded-none">
+                {["all", "pending", "in-progress", "completed"].map((tab) => (
+                    <TabsTrigger 
+                        key={tab} 
+                        value={tab} 
+                        className="capitalize rounded-none border-b-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-transparent px-2 pb-3 pt-0 data-[state=active]:shadow-none font-medium text-gray-500 data-[state=active]:text-black"
+                    >
+                        {tab.replace('-', ' ')}
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+
+            <TabsContent value={activeTab} className="space-y-4 mt-0">
+                {isLoading ? (
+                    <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-gray-400"/></div>
+                ) : filteredTasks.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
+                        <p className="text-gray-500">No tasks found in this category.</p>
+                    </div>
+                ) : (
+                    filteredTasks.map((task) => {
+                        const status = taskStatuses[task.id] || 'pending';
+                        return (
+                            <Card key={task.id} className="border border-gray-100 shadow-sm hover:shadow-md transition-all bg-white group">
+                                <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
+                                    {/* Left: Radio/Status Indicator */}
+                                    <div className="pt-1 md:pt-0">
+                                        <button 
+                                            onClick={() => updateTaskStatus(task.id, status === 'completed' ? 'pending' : 'completed')}
+                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${status === 'completed' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-gray-400'}`}
+                                        >
+                                            {status === 'completed' && <CheckCircle2 className="w-4 h-4 text-white" />}
+                                        </button>
+                                    </div>
+
+                                    {/* Middle: Content */}
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h3 className={`text-lg font-bold text-gray-900 group-hover:text-lms-blue transition-colors ${status === 'completed' ? 'line-through text-gray-400' : ''}`}>
+                                                    {task.title}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`w-2 h-2 rounded-full ${task.course % 2 === 0 ? 'bg-blue-500' : 'bg-purple-500'}`}></span>
+                                                    <span className="text-sm text-gray-500 font-medium">
+                                                        {task.course_detail?.name || 'General Task'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {/* Badges on Desktop */}
+                                            <div className="hidden md:flex gap-2">
+                                                {getPriorityBadge(task.id)}
+                                                <Badge variant="secondary" className="text-[10px] bg-gray-100 text-gray-600 px-2 border-0">Assignment</Badge>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-sm text-gray-500 line-clamp-2">{task.description}</p>
+                                        
+                                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 pt-2">
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar className="w-4 h-4" />
+                                                {format(new Date(task.due_date), "MMM dd, yyyy")}
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="w-4 h-4" />
+                                                {format(new Date(task.due_date), "hh:mm a")}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-gray-500 font-semibold">
+                                                <FileText className="w-4 h-4" />
+                                                100 pts
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Actions */}
+                                    <div className="flex flex-col gap-2 min-w-[140px] md:items-end mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
+                                        {/* Mobile Badges */}
+                                        <div className="flex md:hidden gap-2 mb-2">
+                                            {getPriorityBadge(task.id)}
+                                            <Badge variant="secondary" className="text-[10px] bg-gray-100 text-gray-600">Assignment</Badge>
+                                        </div>
+
+                                        {canAdd ? (
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" size="sm" onClick={() => handleEdit(task)}>
+                                                    <Pencil className="w-4 h-4 mr-2" /> Edit
+                                                </Button>
+                                                <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200" onClick={() => handleDelete(task.id)}>
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            status !== 'completed' ? (
+                                                <Button 
+                                                    className="bg-gray-900 hover:bg-black text-white w-full md:w-auto" 
+                                                    size="sm"
+                                                    onClick={() => updateTaskStatus(task.id, 'in-progress')}
+                                                >
+                                                    Start Task
+                                                </Button>
+                                            ) : (
+                                                <Button variant="outline" className="w-full md:w-auto text-green-600 border-green-200 bg-green-50" size="sm" disabled>
+                                                    Completed
+                                                </Button>
+                                            )
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })
+                )}
+            </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );

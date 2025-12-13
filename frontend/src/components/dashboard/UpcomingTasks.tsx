@@ -1,11 +1,11 @@
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { Card } from "../ui/card";
+import { Badge } from "../ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { assignmentService, Assignment } from "@/services/assignmentService";
+import { assignmentService, Assignment } from "../../services/assignmentService";
 import { format } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "../ui/skeleton";
+import { Calendar } from "lucide-react";
 
 export function UpcomingTasks() {
   const [tasks, setTasks] = useState<Assignment[]>([]);
@@ -17,7 +17,6 @@ export function UpcomingTasks() {
       .then(data => {
         // @ts-ignore
         const list = Array.isArray(data) ? data : (data.results || []);
-        // Get top 3 tasks
         setTasks(list.slice(0, 3)); 
       })
       .catch(err => console.error(err))
@@ -26,50 +25,59 @@ export function UpcomingTasks() {
 
   if (isLoading) {
     return (
-      <Card className="p-6 space-y-4">
+      <Card className="p-6 space-y-4 h-full border-none shadow-sm">
         <Skeleton className="h-6 w-1/3" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
       </Card>
     );
   }
 
   return (
-    <Card className="p-6 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Upcoming Tasks</h3>
-        <Link to="/tasks" className="text-sm text-muted-foreground hover:text-lms-blue">
+    <Card className="p-6 h-full border-none shadow-sm bg-white">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-bold text-gray-800">Upcoming Tasks</h3>
+        <Link to="/tasks" className="text-sm font-medium text-gray-500 hover:text-gray-900">
           View All
         </Link>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {tasks.length === 0 ? (
-          <div className="text-center py-8 bg-muted/30 rounded-lg border border-dashed">
-            <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-            <p className="text-sm text-muted-foreground">No active tasks.</p>
+          <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+            <p className="text-sm text-gray-500">No active tasks.</p>
           </div>
         ) : (
-          tasks.map((task) => (
+          tasks.map((task, index) => (
             <div
               key={task.id}
-              onClick={() => navigate("/tasks")} // Click to go to Tasks page
-              className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-lms-orange hover:bg-accent/40 transition-all cursor-pointer"
+              onClick={() => navigate("/tasks")}
+              className="flex flex-col p-4 rounded-xl border border-gray-100 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer bg-white group"
             >
-              {/* Date Indicator */}
-              <div className="flex flex-col items-center justify-center w-12 h-12 bg-muted rounded-md text-xs">
-                <span className="font-bold text-lms-blue">{format(new Date(task.due_date), "dd")}</span>
-                <span className="text-[10px] uppercase text-muted-foreground">{format(new Date(task.due_date), "MMM")}</span>
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-bold text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                    {task.title}
+                </h4>
+                {/* Simulasi Priority Badge berdasarkan index */}
+                <Badge variant="secondary" className={`
+                    text-[10px] px-2 py-0.5 rounded-md font-semibold
+                    ${index === 0 ? 'bg-red-50 text-red-600' : 
+                      index === 1 ? 'bg-orange-50 text-orange-600' : 
+                      'bg-blue-50 text-blue-600'}
+                `}>
+                    {index === 0 ? 'High' : index === 1 ? 'Medium' : 'Low'}
+                </Badge>
               </div>
               
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center">
-                    <h4 className="font-medium text-sm truncate pr-2">{task.title}</h4>
-                    <Badge variant="outline" className="text-[10px] h-5 px-1">Task</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {task.course_detail?.name || "General"}
-                </p>
+              <p className="text-xs text-gray-500 mb-3 font-medium">
+                  {task.course_detail?.name || "General Task"}
+              </p>
+
+              <div className="flex items-center text-xs text-gray-400 gap-2">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{format(new Date(task.due_date), "MMM dd, yyyy")}</span>
+                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span>{format(new Date(task.due_date), "HH:mm a")}</span>
               </div>
             </div>
           ))
