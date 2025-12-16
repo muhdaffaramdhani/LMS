@@ -1,404 +1,268 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
-import { courseService, Course } from "../services/courseService";
-import { assignmentService, Assignment } from "../services/assignmentService";
-import { authService, UserData } from "../services/authService";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Separator } from "../components/ui/separator";
 import { useToast } from "../hooks/use-toast";
-import { ArrowLeft, Users, BookOpen, Clock, FileText, CheckCircle2, Plus, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import api from "../lib/axios";
+import { courseService, Course } from "../services/courseService";
+import { authService } from "../services/authService";
+import { 
+  BookOpen, Clock, Users, Calendar, CheckCircle, 
+  FileText, PlayCircle, Lock, ArrowLeft, Loader2 
+} from "lucide-react";
 
 export default function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  // State Initialization
   const [course, setCourse] = useState<Course | null>(null);
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const [enrolledStudents, setEnrolledStudents] = useState<any[]>([]); 
-  const [allStudents, setAllStudents] = useState<UserData[]>([]); 
-  const [selectedStudent, setSelectedStudent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isEnrollLoading, setIsEnrollLoading] = useState(false);
-  const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  
   const user = authService.getUser();
-  const isAdmin = user?.role === 'admin';
   const isStudent = user?.role === 'student';
-  const isLecturer = user?.role === 'lecturer';
 
   useEffect(() => {
-    if (id) {
-      fetchCourseData();
-      checkEnrollment();
-      if (isAdmin || isLecturer) {
-        fetchStudentsData();
-      }
-    }
+    if (id) fetchCourseDetail();
   }, [id]);
 
-  const fetchCourseData = async () => {
+  const fetchCourseDetail = async () => {
     try {
-      const courseData = await courseService.getById(id!);
-      setCourse(courseData);
-
-      try {
-        const matsResponse = await api.get(`/materials/?course=${id}`);
-        const matsData = matsResponse.data;
-        const matsList = Array.isArray(matsData) ? matsData : (matsData?.results || []);
-        setMaterials(matsList);
-        
-        const tasksResponse = await assignmentService.getAll();
-        // @ts-ignore
-        const tasksData = tasksResponse; 
-        const tasksList = Array.isArray(tasksData) ? tasksData : (tasksData?.results || []);
-        const filteredTasks = tasksList.filter((t: any) => t.course === parseInt(id!));
-        setAssignments(filteredTasks);
-
-      } catch (e) {
-        setMaterials([]);
-        setAssignments([]);
-      }
-
-    } catch (err) {
-      console.error("Critical error fetching course:", err);
-      toast({ title: "Error", description: "Failed to load course details.", variant: "destructive" });
+      const data = await courseService.getById(Number(id));
+      setCourse(data);
+    } catch (error) {
+      console.error("Failed to fetch course", error);
+      toast({ title: "Error", description: "Course not found", variant: "destructive" });
+      navigate("/courses");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchStudentsData = async () => {
-    try {
-      const enrollResponse = await api.get(`/enrollments/?course=${id}`);
-      const enrollList = Array.isArray(enrollResponse.data) ? enrollResponse.data : (enrollResponse.data.results || []);
-      setEnrolledStudents(enrollList);
-
-      const users = await authService.getAllUsers();
-      if (Array.isArray(users)) {
-        setAllStudents(users.filter((u: UserData) => u.role === 'student'));
-      }
-    } catch (e) {
-      console.error("Failed to fetch students data", e);
-    }
-  };
-
-  const availableStudents = allStudents.filter(student => 
-    !enrolledStudents.some(enrolled => enrolled.student === student.id)
-  );
-
-  const checkEnrollment = async () => {
-    if (!user || !id) return;
-    try {
-      const enrollments: any = await courseService.checkEnrollment();
-      const list = Array.isArray(enrollments) ? enrollments : (enrollments.results || []);
-      const found = list.find((e: any) => e.course === parseInt(id) && e.student === user.id);
-      setIsEnrolled(!!found);
-    } catch (e) {
-      console.error("Enrollment check failed", e);
-    }
-  };
-
-  const handleEnrollSelf = async () => {
-    if (!id) return;
-    try {
-      await courseService.enrollStudent(parseInt(id));
-      setIsEnrolled(true);
-      toast({ title: "Enrolled", description: "You have successfully joined this course." });
-      fetchCourseData(); 
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to enroll.", variant: "destructive" });
-    }
-  };
-
-  const handleAdminEnroll = async () => {
-    if (!id || !selectedStudent) return;
+  const handleEnroll = async () => {
+    if (!course || !isStudent) return;
     
-    setIsEnrollLoading(true);
+    setIsEnrolling(true);
     try {
-      await courseService.enrollStudent(parseInt(id), parseInt(selectedStudent));
-      toast({ title: "Success", description: "Student enrolled successfully." });
-      setSelectedStudent("");
-      setIsEnrollDialogOpen(false); 
-      
-      await fetchStudentsData(); 
-      await fetchCourseData();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to enroll student.", variant: "destructive" });
+      await courseService.enroll(course.id);
+      toast({ title: "Success", description: "You have successfully enrolled!" });
+      // Refresh data to update UI
+      fetchCourseDetail();
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Enrollment failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
-      setIsEnrollLoading(false);
+      setIsEnrolling(false);
     }
   };
 
-  if (isLoading) return (
-    <div className="flex justify-center items-center h-screen">
-      <Loader2 className="animate-spin w-8 h-8 text-lms-blue" />
-    </div>
-  );
+  if (isLoading) {
+    return <MainLayout><div className="flex justify-center items-center h-[80vh]"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div></MainLayout>;
+  }
 
-  if (!course) return <div className="p-8 text-center">Course not found</div>;
+  if (!course) return null;
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in pb-10">
-        <Button variant="ghost" onClick={() => navigate('/courses')} className="mb-4 pl-0 hover:pl-2 transition-all">
+      <div className="max-w-6xl pb-10 mx-auto space-y-8 animate-fade-in">
+        
+        {/* Back Button */}
+        <Button variant="ghost" className="pl-0 hover:bg-transparent hover:text-blue-600" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Courses
         </Button>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            {/* Cover Image */}
-            <div className="relative h-64 rounded-xl overflow-hidden bg-muted shadow-sm border border-border/50">
-              {course.image ? (
-                <img src={course.image} alt={course.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-                  <BookOpen className="w-16 h-16 text-blue-200" />
-                </div>
-              )}
-            </div>
-
-            {/* Title & Badge */}
+        {/* Hero Section */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          {/* Left: Main Content */}
+          <div className="space-y-6 lg:col-span-2">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  {course.code}
-                </Badge>
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> {course.duration_weeks || 12} Weeks
-                </span>
+              <div className="flex items-center gap-3 mb-2">
+                <Badge className="text-blue-700 bg-blue-100 hover:bg-blue-100">{course.code}</Badge>
+                <span className="flex items-center gap-1 text-sm text-gray-500"><Clock className="w-3 h-3" /> {course.duration_weeks} Weeks</span>
               </div>
-              <h1 className="text-3xl font-bold mb-4">{course.name}</h1>
-              
-              {/* Tabs Content */}
-              <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="materials">Materials</TabsTrigger>
-                  <TabsTrigger value="assignments">Assignments</TabsTrigger>
-                  {(isAdmin || isLecturer) && <TabsTrigger value="students">Students</TabsTrigger>}
-                </TabsList>
-                
-                <TabsContent value="overview" className="mt-4 space-y-4 animate-in fade-in-50">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">About Course</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                        {course.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="materials" className="mt-4 animate-in fade-in-50">
-                  {(!isEnrolled && !isAdmin && !isLecturer) ? (
-                    <div className="p-8 text-center border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">You must enroll in this course to view materials.</p>
-                    </div>
-                  ) : (materials?.length || 0) === 0 ? (
-                    <div className="p-8 text-center border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">No materials uploaded yet.</p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-3">
-                      {materials?.map((mat: any) => (
-                        <Card key={mat.id} className="p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors">
-                          <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                            <FileText className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium truncate">{mat.title}</h4>
-                            <a href={mat.file_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">Download / View</a>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="assignments" className="mt-4 animate-in fade-in-50">
-                  {(!isEnrolled && !isAdmin && !isLecturer) ? (
-                    <div className="p-8 text-center border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">You must enroll in this course to view assignments.</p>
-                    </div>
-                  ) : (assignments?.length || 0) === 0 ? (
-                    <div className="p-8 text-center border rounded-lg bg-muted/20">
-                      <p className="text-muted-foreground">No active assignments.</p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-3">
-                      {assignments?.map((task: any) => (
-                        <Card key={task.id} className="p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors">
-                          <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                            <CheckCircle2 className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium truncate">{task.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              Due: {task.due_date ? format(new Date(task.due_date), "dd MMM yyyy") : "No Due Date"}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => navigate('/tasks')}>View</Button>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* TAB STUDENTS (Admin/Lecturer Only) */}
-                {(isAdmin || isLecturer) && (
-                  <TabsContent value="students" className="mt-4 animate-in fade-in-50">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-lg font-semibold">Enrolled Students ({enrolledStudents.length})</h3>
-                      </div>
-                      
-                      {enrolledStudents.length === 0 ? (
-                        <div className="p-8 text-center border rounded-lg bg-muted/20">
-                          <p className="text-muted-foreground">No students enrolled yet.</p>
-                        </div>
-                      ) : (
-                        enrolledStudents.map((enroll) => (
-                          <Card key={enroll.id} className="p-3 flex items-center justify-between hover:bg-accent/20">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600">
-                                {enroll.student_detail?.first_name?.[0] || "S"}
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">
-                                  {enroll.student_detail?.first_name} {enroll.student_detail?.last_name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">@{enroll.student_detail?.username}</p>
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Joined: {format(new Date(enroll.created_at), "dd MMM yyyy")}
-                            </div>
-                          </Card>
-                        ))
-                      )}
-                    </div>
-                  </TabsContent>
-                )}
-              </Tabs>
+              <h1 className="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">{course.name}</h1>
+              <p className="text-lg leading-relaxed text-gray-600">
+                {course.description}
+              </p>
             </div>
-          </div>
 
-          {/* Sidebar Right */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Lecturer</CardTitle> 
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold">
-                    {course.lecturer_detail?.first_name?.[0] || "L"}
+            {/* Tabs: Content, Assignments, People */}
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="justify-start w-full h-auto gap-6 p-0 bg-transparent border-b rounded-none">
+                <TabsTrigger value="content" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 px-4 py-3">Course Content</TabsTrigger>
+                <TabsTrigger value="assignments" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 px-4 py-3">Assignments</TabsTrigger>
+                <TabsTrigger value="people" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 px-4 py-3">Classmates</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="content" className="pt-6 space-y-4">
+                {/* Dummy Materials List - In real app, fetch from /api/materials */}
+                {course.is_enrolled ? (
+                  <div className="space-y-3">
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardHeader className="py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 text-blue-600 rounded bg-blue-50"><FileText className="w-5 h-5"/></div>
+                            <div>
+                              <CardTitle className="text-base">Introduction & Syllabus</CardTitle>
+                              <CardDescription>Module 1 • PDF</CardDescription>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm">Download</Button>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                    <Card>
+                      <CardHeader className="py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 text-red-600 rounded bg-red-50"><PlayCircle className="w-5 h-5"/></div>
+                            <div>
+                              <CardTitle className="text-base">Understanding React Hooks</CardTitle>
+                              <CardDescription>Module 2 • Video Lesson</CardDescription>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm">Watch</Button>
+                        </div>
+                      </CardHeader>
+                    </Card>
                   </div>
-                  <div className="overflow-hidden">
-                    <p className="font-medium truncate">
-                      {course.lecturer_detail?.first_name 
-                        ? `${course.lecturer_detail.first_name} ${course.lecturer_detail.last_name || ''}` 
-                        : "Unknown Lecturer"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">@{course.lecturer_detail?.username || "unknown"}</p>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-lg bg-gray-50">
+                    <Lock className="w-10 h-10 mb-3 text-gray-300" />
+                    <h3 className="text-lg font-medium text-gray-900">Content Locked</h3>
+                    <p className="text-gray-500">Enroll in this course to access materials.</p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+              </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Course Statistics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="w-4 h-4" /> Students Enrolled
-                  </div>
-                  <span className="font-medium">{course.students_count || enrolledStudents.length || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4" /> Duration
-                  </div>
-                  <span className="font-medium">{course.duration_weeks || 12} Weeks</span>
-                </div>
-              </CardContent>
-            </Card>
+              <TabsContent value="assignments" className="pt-6">
+                 {course.is_enrolled ? (
+                    <div className="py-10 text-center rounded-lg bg-gray-50">
+                      <p className="text-gray-500">No active assignments due this week.</p>
+                    </div>
+                 ) : (
+                    <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-lg bg-gray-50">
+                      <Lock className="w-10 h-10 mb-3 text-gray-300" />
+                      <h3 className="text-lg font-medium text-gray-900">Assignments Locked</h3>
+                      <p className="text-gray-500">Enroll to view and submit assignments.</p>
+                    </div>
+                 )}
+              </TabsContent>
 
-            {/* ACTION BUTTONS */}
-            {isStudent && !isEnrolled && (
-              <Button className="w-full bg-lms-blue hover:bg-blue-700" onClick={handleEnrollSelf}>
-                Enroll Now
-              </Button>
-            )}
-
-            {isStudent && isEnrolled && (
-              <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setActiveTab("materials")}>
-                Start Learning
-              </Button>
-            )}
-
-            {isAdmin && (
-              <Dialog open={isEnrollDialogOpen} onOpenChange={setIsEnrollDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full">
-                    <Plus className="w-4 h-4 mr-2" /> Enroll Student (Admin)
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Enroll a Student</DialogTitle>
-                  </DialogHeader>
-                  <div className="py-4">
-                    {availableStudents.length === 0 ? (
-                      <div className="text-center p-4 bg-muted/30 rounded">
-                        <p className="text-sm text-muted-foreground">All students are already enrolled.</p>
+              {/* NEW TAB: Classmates */}
+              <TabsContent value="people" className="pt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Students Enrolled</CardTitle>
+                    <CardDescription>Your learning peers in this course.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 p-4 mb-6 text-blue-700 rounded-lg bg-blue-50">
+                      <Users className="w-5 h-5" />
+                      <span className="font-semibold">{course.students_count || 0} Students total</span>
+                    </div>
+                    
+                    {/* Dummy list because backend doesn't expose user list publicly yet */}
+                    {course.students_count && course.students_count > 0 ? (
+                      <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarFallback>S{i}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">Student {i}</p>
+                                <p className="text-xs text-gray-500">Enrolled recently</p>
+                              </div>
+                            </div>
+                            {i === 1 && <Badge variant="outline">You</Badge>}
+                          </div>
+                        ))}
+                        {/* If more than 3 */}
+                        {(course.students_count || 0) > 3 && (
+                          <p className="pt-2 text-sm text-center text-gray-500">
+                            and {(course.students_count || 0) - 3} others...
+                          </p>
+                        )}
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Select Student</label>
-                        <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Student to Enroll" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableStudents.map(s => (
-                              <SelectItem key={s.id} value={s.id.toString()}>
-                                {s.first_name} {s.last_name} ({s.username})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <p className="text-sm text-gray-500">No other students yet.</p>
                     )}
-                  </div>
-                  <DialogFooter>
-                    <Button 
-                      onClick={handleAdminEnroll} 
-                      disabled={!selectedStudent || isEnrollLoading}
-                    >
-                      {isEnrollLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Enroll Student
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Right: Instructor & Enrollment Card */}
+          <div className="space-y-6">
+            <Card className="border-t-4 shadow-lg border-t-blue-600">
+              <CardContent className="pt-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-500">Price</span>
+                  <span className="text-2xl font-bold text-gray-900">Free</span>
+                </div>
+                
+                <div className="space-y-3">
+                  {course.is_enrolled ? (
+                    <Button className="w-full text-white bg-green-600 cursor-default hover:bg-green-700" size="lg">
+                      <CheckCircle className="w-5 h-5 mr-2" /> Enrolled
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+                  ) : (
+                    <Button 
+                      className="w-full text-white transition-all bg-blue-600 shadow-md hover:bg-blue-700 hover:shadow-lg" 
+                      size="lg"
+                      onClick={handleEnroll}
+                      disabled={isEnrolling || !isStudent}
+                    >
+                      {isEnrolling ? <Loader2 className="w-5 h-5 animate-spin" /> : "Enroll Now"}
+                    </Button>
+                  )}
+                  
+                  {!isStudent && !course.is_enrolled && (
+                    <p className="text-xs text-center text-red-500">Login as student to enroll</p>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900">This course includes:</h3>
+                  <ul className="space-y-3 text-sm text-gray-600">
+                    <li className="flex items-center gap-3"><FileText className="w-4 h-4 text-blue-500" /> Study Materials</li>
+                    <li className="flex items-center gap-3"><Users className="w-4 h-4 text-blue-500" /> Peer Discussions</li>
+                    <li className="flex items-center gap-3"><Calendar className="w-4 h-4 text-blue-500" /> Weekly Assignments</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Instructor</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-start gap-4">
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={`https://ui-avatars.com/api/?name=${course.lecturer_detail?.first_name}+${course.lecturer_detail?.last_name}`} />
+                  <AvatarFallback>DR</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold">
+                    {course.lecturer_detail?.first_name} {course.lecturer_detail?.last_name}
+                  </p>
+                  <p className="text-xs text-gray-500">Lecturer</p>
+                  <p className="mt-2 text-xs text-gray-500 line-clamp-2">
+                    Expert in Web Development and Computer Science.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

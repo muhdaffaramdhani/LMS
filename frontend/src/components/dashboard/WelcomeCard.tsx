@@ -3,7 +3,7 @@ import { authService } from "../../services/authService";
 import { assignmentService } from "../../services/assignmentService"; 
 import { useState, useEffect } from "react";
 
-export function WelcomeCard() {
+export default function WelcomeCard() {
   const [user, setUser] = useState(authService.getUser());
   const [progress, setProgress] = useState(0);
 
@@ -14,7 +14,6 @@ export function WelcomeCard() {
 
     const calculateProgress = async () => {
       try {
-        // Mengambil semua tugas untuk menghitung persentase simulasi
         const data = await assignmentService.getAll();
         // @ts-ignore
         const tasks = Array.isArray(data) ? data : (data.results || []);
@@ -28,7 +27,6 @@ export function WelcomeCard() {
         const taskStatuses = savedStatuses ? JSON.parse(savedStatuses) : {};
         const completedCount = tasks.filter((task: any) => taskStatuses[task.id] === 'completed').length;
         
-        // Kalkulasi sederhana
         const percentage = Math.round((completedCount / tasks.length) * 100);
         setProgress(percentage);
         
@@ -51,30 +49,29 @@ export function WelcomeCard() {
 
   const displayName = user?.first_name || user?.username || "User";
 
-  // Radius dan circumference untuk lingkaran progress SVG
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <Card className="p-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-none shadow-sm relative overflow-hidden">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+    <Card className="relative p-8 overflow-hidden border-none shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50">
+      <div className="relative z-10 flex flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex-1 space-y-2">
           <h2 className="text-3xl font-bold text-gray-800 capitalize">
-            Hi {displayName} 👋
+            Hi {displayName}
           </h2>
           <p className="text-gray-500">
             Welcome back! You're doing great this semester.
           </p>
 
-          <div className="mt-6 max-w-lg">
+          <div className="max-w-lg mt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-600">Overall Progress</span>
               <span className="text-sm font-bold text-gray-800">{progress}%</span>
             </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-3 overflow-hidden bg-gray-200 rounded-full">
               <div
-                className="h-full bg-gray-900 rounded-full transition-all duration-1000 ease-out"
+                className="h-full transition-all duration-1000 ease-out bg-gray-900 rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -82,7 +79,7 @@ export function WelcomeCard() {
         </div>
 
         {/* Circular Progress Indicator (Desktop) */}
-        <div className="hidden md:block relative w-32 h-32 flex-shrink-0">
+        <div className="relative flex-shrink-0 hidden w-32 h-32 md:block">
            {/* Background Circle */}
            <svg className="w-full h-full transform -rotate-90">
             <circle
@@ -115,8 +112,8 @@ export function WelcomeCard() {
       </div>
       
       {/* Decorative Blur */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 right-20 w-64 h-64 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-y-1/2"></div>
+      <div className="absolute top-0 right-0 w-64 h-64 translate-x-1/2 -translate-y-1/2 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+      <div className="absolute bottom-0 w-64 h-64 translate-y-1/2 bg-purple-200 rounded-full right-20 mix-blend-multiply filter blur-3xl opacity-20"></div>
     </Card>
   );
 }

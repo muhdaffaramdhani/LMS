@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Pastikan port 8000 (sesuai docker-compose backend)
+// Backend berjalan di port 8000
 const BASE_URL = 'http://localhost:8000/api/';
 
 export const api = axios.create({
@@ -10,10 +10,9 @@ export const api = axios.create({
   },
 });
 
-// Interceptor ini sudah benar untuk menangani Token JWT
+// Interceptor untuk menyisipkan Token JWT secara otomatis
 api.interceptors.request.use(
   (config) => {
-    // Backend Anda menggunakan 'access_token' untuk nama key di localStorage (sesuai authService.ts)
     const token = localStorage.getItem('access_token'); 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;

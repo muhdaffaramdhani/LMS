@@ -1,88 +1,90 @@
-import { Card } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { assignmentService, Assignment } from "../../services/assignmentService";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, Clock, CalendarDays, Loader2 } from "lucide-react";
+import api from "@/lib/axios";
 import { format } from "date-fns";
-import { Skeleton } from "../ui/skeleton";
-import { Calendar } from "lucide-react";
 
-export function UpcomingTasks() {
-  const [tasks, setTasks] = useState<Assignment[]>([]);
+interface Task {
+  id: number;
+  title: string;
+  course_detail?: {
+    code: string;
+    name: string;
+  };
+  due_date: string;
+  status?: string; // Backend mungkin belum kirim status submission, kita asumsikan 'pending' dulu
+}
+
+export default function UpcomingTasks() {
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    assignmentService.getAll()
-      .then(data => {
+    const fetchTasks = async () => {
+      try {
+        const response = await api.get('/assignments/');
         // @ts-ignore
-        const list = Array.isArray(data) ? data : (data.results || []);
-        setTasks(list.slice(0, 3)); 
-      })
-      .catch(err => console.error(err))
-      .finally(() => setIsLoading(false));
+        const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+        setTasks(data);
+      } catch (error) {
+        console.error("Failed to fetch tasks", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasks();
   }, []);
 
-  if (isLoading) {
-    return (
-      <Card className="p-6 space-y-4 h-full border-none shadow-sm">
-        <Skeleton className="h-6 w-1/3" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </Card>
-    );
-  }
-
   return (
-    <Card className="p-6 h-full border-none shadow-sm bg-white">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-800">Upcoming Tasks</h3>
-        <Link to="/tasks" className="text-sm font-medium text-gray-500 hover:text-gray-900">
-          View All
-        </Link>
-      </div>
-
-      <div className="space-y-4">
-        {tasks.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-            <p className="text-sm text-gray-500">No active tasks.</p>
+    <Card className="border-gray-100 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl font-bold text-gray-800">Upcoming Tasks</CardTitle>
+          <Badge variant="outline" className="font-normal text-gray-500">
+            {tasks.length} Pending
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="py-8 text-center text-gray-500">
+            <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-500/50" />
+            <p>There are no pending tasks.</p>
           </div>
         ) : (
-          tasks.map((task, index) => (
+          tasks.map((task) => (
             <div
               key={task.id}
-              onClick={() => navigate("/tasks")}
-              className="flex flex-col p-4 rounded-xl border border-gray-100 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer bg-white group"
+              className="flex items-start gap-3 p-3 transition-all border rounded-lg border-gray-50 bg-gray-50/50 hover:bg-white hover:border-blue-100 hover:shadow-sm group"
             >
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                    {task.title}
-                </h4>
-                {/* Simulasi Priority Badge berdasarkan index */}
-                <Badge variant="secondary" className={`
-                    text-[10px] px-2 py-0.5 rounded-md font-semibold
-                    ${index === 0 ? 'bg-red-50 text-red-600' : 
-                      index === 1 ? 'bg-orange-50 text-orange-600' : 
-                      'bg-blue-50 text-blue-600'}
-                `}>
-                    {index === 0 ? 'High' : index === 1 ? 'Medium' : 'Low'}
-                </Badge>
+              <div className="mt-1 text-orange-500">
+                <Clock className="w-5 h-5" />
               </div>
-              
-              <p className="text-xs text-gray-500 mb-3 font-medium">
-                  {task.course_detail?.name || "General Task"}
-              </p>
-
-              <div className="flex items-center text-xs text-gray-400 gap-2">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{format(new Date(task.due_date), "MMM dd, yyyy")}</span>
-                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <span>{format(new Date(task.due_date), "HH:mm a")}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {task.title}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-white border-gray-200">
+                    {/* Fallback jika course detail belum ada di serializer */}
+                    Course Task
+                  </Badge>
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <CalendarDays className="w-3 h-3" /> 
+                    {new Date(task.due_date).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             </div>
           ))
         )}
-      </div>
+      </CardContent>
     </Card>
   );
 }

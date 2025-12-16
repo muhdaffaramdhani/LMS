@@ -53,23 +53,29 @@ export default function Profile() {
         // @ts-ignore
         bio: user.bio || ""
       }));
-      fetchUserSpecificCourses();
+      
+      // Jika bukan admin, fetch courses
+      if (!isAdmin) {
+        fetchUserSpecificCourses();
+      }
     }
   }, [user]);
 
   const fetchUserSpecificCourses = async () => {
-    if (!user || isAdmin) return; // Admin tidak punya daftar kursus spesifik di profil
+    if (!user || isAdmin) return; 
     
     setIsCoursesLoading(true);
     try {
       if (isStudent) {
-        // Fetch Enrollments for Student
-        const response = await api.get('/enrollments/');
-        const allEnrollments = Array.isArray(response.data) ? response.data : response.data.results || [];
-        const myEnrollments = allEnrollments.filter((e: any) => e.student === user.id);
-        setMyCourses(myEnrollments.map((e: any) => e.course_detail));
+        // Fetch Enrollments for Student using the generic endpoint logic we fixed
+        // Kita menggunakan endpoint course dengan filter ?enrolled=true yang sudah kita buat di backend
+        const data = await courseService.getAll({ enrolled: true });
+        // @ts-ignore
+        const list = Array.isArray(data) ? data : data.results || [];
+        setMyCourses(list);
       } else if (isLecturer) {
         // Fetch Courses taught by Lecturer
+        // Lecturer biasanya melihat semua course, tapi difilter di frontend atau backend
         const data = await courseService.getAll();
         // @ts-ignore
         const allCourses = Array.isArray(data) ? data : data.results || [];
@@ -158,29 +164,29 @@ export default function Profile() {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in pb-10">
+      <div className="max-w-5xl pb-10 mx-auto animate-fade-in">
         
         {/* Header Profile Card */}
-        <Card className="mb-8 overflow-hidden border-none shadow-lg bg-white">
+        <Card className="mb-8 overflow-hidden bg-white border-none shadow-lg">
           {/* Background Banner */}
           <div className="h-36 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600"></div>
           
-          <div className="px-8 pb-8 pt-10">
-            <div className="relative flex flex-col md:flex-row items-center md:items-end -mt-16 gap-6">
+          <div className="px-8 pt-10 pb-8">
+            <div className="relative flex flex-col items-center gap-6 -mt-16 md:flex-row md:items-end">
               
               {/* Avatar */}
-              <Avatar className="w-32 h-32 border-4 border-white shadow-xl bg-white shrink-0">
-                <AvatarFallback className="text-4xl bg-slate-100 text-slate-700 font-bold">
+              <Avatar className="w-32 h-32 bg-white border-4 border-white shadow-xl shrink-0">
+                <AvatarFallback className="text-4xl font-bold bg-slate-100 text-slate-700">
                   {fullName?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               
               {/* User Info & Actions */}
-              <div className="flex-1 flex flex-col md:flex-row items-center md:items-end justify-between gap-4 w-full text-center md:text-left pt-2 md:pt-0">
+              <div className="flex flex-col items-center justify-between flex-1 w-full gap-4 pt-2 text-center md:flex-row md:items-end md:text-left md:pt-0">
                 <div className="mb-2">
-                  <h1 className="text-3xl font-bold capitalize text-gray-900">{fullName}</h1>
-                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 text-muted-foreground mt-2">
-                      <Badge variant="secondary" className="px-3 py-1 capitalize text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200">
+                  <h1 className="text-3xl font-bold text-gray-900 capitalize">{fullName}</h1>
+                  <div className="flex flex-wrap items-center justify-center gap-3 mt-2 md:justify-start text-muted-foreground">
+                      <Badge variant="secondary" className="px-3 py-1 text-sm text-blue-700 capitalize border-blue-200 bg-blue-50 hover:bg-blue-100">
                           {user?.role || "User"}
                       </Badge>
                       <span className="text-sm flex items-center gap-1.5">
@@ -191,11 +197,11 @@ export default function Profile() {
 
                 <div className="mb-4 md:mb-2">
                    {!isEditing ? (
-                     <Button className="gap-2 bg-gray-900 hover:bg-black text-white" onClick={handleEditClick}>
+                     <Button className="gap-2 text-white bg-gray-900 hover:bg-black" onClick={handleEditClick}>
                         <UserIcon className="w-4 h-4" /> Edit Profile
                      </Button>
                    ) : (
-                     <Button variant="outline" className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={handleCancelEdit}>
+                     <Button variant="outline" className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={handleCancelEdit}>
                         <X className="w-4 h-4" /> Cancel Editing
                      </Button>
                    )}
@@ -207,7 +213,7 @@ export default function Profile() {
 
         {/* Tabs Layout */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
-          <TabsList className="w-full justify-start bg-transparent border-b rounded-none p-0 h-auto gap-6">
+          <TabsList className="justify-start w-full h-auto gap-6 p-0 bg-transparent border-b rounded-none">
             <TabsTrigger 
               value="settings" 
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 px-4 py-3 font-medium text-muted-foreground transition-all hover:text-foreground"
@@ -226,13 +232,13 @@ export default function Profile() {
 
           {/* TAB: SETTINGS */}
           <TabsContent value="settings" className="space-y-6 animate-in fade-in-50">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               
               {/* Left Column: Personal Info Form */}
               <div className={isEditing ? "lg:col-span-2" : "lg:col-span-3"}>
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>Personal Information</CardTitle>
                         <CardDescription>
@@ -240,7 +246,7 @@ export default function Profile() {
                         </CardDescription>
                       </div>
                       {!isEditing && (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
+                        <Badge variant="outline" className="text-gray-500 border-gray-200 bg-gray-50">
                           <Lock className="w-3 h-3 mr-1" /> View Only
                         </Badge>
                       )}
@@ -248,7 +254,7 @@ export default function Profile() {
                   </CardHeader>
                   <CardContent>
                     <form id="profile-form" onSubmit={handleUpdateProfile} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="first_name">First Name</Label>
                           <Input 
@@ -299,12 +305,12 @@ export default function Profile() {
                   </CardContent>
                   
                   {isEditing && (
-                    <CardFooter className="border-t bg-muted/20 px-6 py-4 flex justify-between items-center">
+                    <CardFooter className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
                         <span className="text-xs text-muted-foreground">Unsaved changes will be lost if you leave.</span>
                         <div className="flex gap-3">
                           <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
                           <Button type="submit" form="profile-form" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             <Save className="w-4 h-4 mr-2" /> Save Changes
                           </Button>
                         </div>
@@ -317,7 +323,7 @@ export default function Profile() {
               {isEditing && (
                 <div className="space-y-6 animate-in slide-in-from-right-10 fade-in-20">
                   <Card className="border-blue-100 shadow-sm">
-                    <CardHeader className="bg-blue-50/50 pb-4">
+                    <CardHeader className="pb-4 bg-blue-50/50">
                       <CardTitle className="text-lg text-blue-900">Change Password</CardTitle>
                       <CardDescription>Secure your account with a new password.</CardDescription>
                     </CardHeader>
@@ -344,24 +350,24 @@ export default function Profile() {
                           />
                         </div>
                         <Button type="submit" className="w-full mt-2" variant="outline" disabled={isLoading || !passwordData.newPassword}>
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
+                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update Password"}
                         </Button>
                       </form>
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-red-50 border-red-100">
-                     <CardHeader className="pb-3">
-                        <CardTitle className="text-red-700 text-base">Danger Zone</CardTitle>
-                     </CardHeader>
-                     <CardContent>
-                        <p className="text-xs text-red-600/80 mb-4">
+                  <Card className="border-red-100 bg-red-50">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base text-red-700">Danger Zone</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="mb-4 text-xs text-red-600/80">
                           Deleting your account is permanent.
                         </p>
                         <Button variant="destructive" size="sm" className="w-full" onClick={() => toast({title: "Action Restricted", description: "Please contact support to delete your account."})}>
                           Delete Account
                         </Button>
-                     </CardContent>
+                      </CardContent>
                   </Card>
                 </div>
               )}
@@ -372,55 +378,55 @@ export default function Profile() {
           {!isAdmin && (
             <TabsContent value="courses" className="space-y-6 animate-in fade-in-50">
                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight">
-                        {isLecturer ? "Courses You Teach" : "Enrolled Courses"}
-                    </h2>
-                    <p className="text-muted-foreground">
-                        {isLecturer 
-                          ? "Manage the curriculum and students for your classes." 
-                          : "Access materials and assignments for your active courses."}
-                    </p>
-                  </div>
+                 <div>
+                   <h2 className="text-xl font-bold tracking-tight">
+                       {isLecturer ? "Courses You Teach" : "Enrolled Courses"}
+                   </h2>
+                   <p className="text-muted-foreground">
+                       {isLecturer 
+                         ? "Manage the curriculum and students for your classes." 
+                         : "Access materials and assignments for your active courses."}
+                   </p>
+                 </div>
                </div>
 
                {isCoursesLoading ? (
-                 <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+                 <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-blue-500 animate-spin" /></div>
                ) : myCourses.length === 0 ? (
-                 <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
-                    <div className="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <div className="py-16 text-center bg-white border border-gray-300 border-dashed rounded-xl">
+                    <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50">
                         <GraduationCap className="w-8 h-8 text-blue-500" />
                     </div>
                     <h3 className="text-lg font-medium text-gray-900">No Courses Found</h3>
-                    <p className="text-gray-500 mt-1 max-w-sm mx-auto">
+                    <p className="max-w-sm mx-auto mt-1 text-gray-500">
                         {isLecturer 
                            ? "You haven't been assigned to teach any courses yet." 
                            : "You haven't enrolled in any courses yet. Go to the Courses page to join one."}
                     </p>
                  </div>
                ) : (
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {myCourses.map((course) => (
-                       <Card key={course.id} className="group hover:shadow-lg transition-all duration-300 border-border/60 overflow-hidden">
-                          <div className="h-32 bg-gray-100 relative overflow-hidden">
+                       <Card key={course.id} className="overflow-hidden transition-all duration-300 cursor-pointer group hover:shadow-lg border-border/60" onClick={() => window.location.href = `/courses/${course.id}`}>
+                          <div className="relative h-32 overflow-hidden bg-gray-100">
                              {course.image ? (
-                                <img src={course.image} alt={course.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                <img src={course.image} alt={course.name} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                                <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-slate-100 to-slate-200">
                                    <BookOpen className="w-10 h-10 text-slate-400" />
                                 </div>
                              )}
-                             <Badge className="absolute top-3 right-3 bg-white/90 text-slate-800 shadow-sm font-semibold hover:bg-white">
+                             <Badge className="absolute font-semibold shadow-sm top-3 right-3 bg-white/90 text-slate-800 hover:bg-white">
                                 {course.code}
                              </Badge>
                           </div>
                           
                           <CardHeader className="pb-3">
-                             <CardTitle className="line-clamp-1 text-lg group-hover:text-blue-600 transition-colors">
+                             <CardTitle className="text-lg transition-colors line-clamp-1 group-hover:text-blue-600">
                                 {course.name}
                              </CardTitle>
                              {!isLecturer && (
-                               <CardDescription className="line-clamp-1 flex items-center gap-1">
+                               <CardDescription className="flex items-center gap-1 line-clamp-1">
                                   <UserIcon className="w-3 h-3" /> 
                                   {course.lecturer_detail?.first_name 
                                      ? `${course.lecturer_detail.first_name} ${course.lecturer_detail.last_name}` 
@@ -437,8 +443,11 @@ export default function Profile() {
 
                           <CardFooter className="pt-0">
                              <Button 
-                                className="w-full bg-slate-900 hover:bg-blue-600 text-white transition-colors" 
-                                onClick={() => window.location.href = `/courses/${course.id}`}
+                                className="w-full text-white transition-colors bg-slate-900 hover:bg-blue-600" 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.location.href = `/courses/${course.id}`;
+                                }}
                              >
                                 Go to Class
                              </Button>

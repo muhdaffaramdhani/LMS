@@ -1,49 +1,54 @@
-import { Card } from "../ui/card";
-import { FileText, CheckCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BookOpen, Calendar } from "lucide-react";
 
-const actions = [
-  {
-    icon: FileText,
-    label: "Materials",
-    description: "Browse learning materials",
-    color: "bg-blue-500",
-    href: "/courses",
-  },
-  {
-    icon: CheckCircle,
-    label: "Assignments",
-    description: "View assignments",
-    color: "bg-green-500",
-    href: "/tasks",
-  },
-];
+export default function QuickActions() {
+  const navigate = useNavigate();
 
-export function QuickActions() {
+  const actions = [
+    {
+      title: "Browse Courses",
+      description: "Find new courses to enroll in",
+      icon: BookOpen,
+      onClick: () => navigate("/courses"),
+      color: "text-blue-500",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "View Tasks",
+      description: "Check upcoming assignments",
+      icon: Calendar,
+      onClick: () => navigate("/tasks"),
+      color: "text-purple-500",
+      bgColor: "bg-purple-50",
+    },
+  ];
+
   return (
-    <div>
-      <h3 className="mb-4 text-lg font-bold text-gray-800">Quick Actions</h3>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {actions.map((action) => (
-          <Link key={action.label} to={action.href}>
-            <Card className="p-4 transition-all bg-white border-none shadow-sm cursor-pointer hover:shadow-lg group">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${action.color} text-white shadow-md group-hover:scale-105 transition-transform`}>
-                  <action.icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800">
-                    {action.label}
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    {action.description}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </Link>
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+        <CardDescription>Common tasks and shortcuts</CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4">
+        {actions.map((action, index) => (
+          <Button
+            key={index}
+            variant="outline"
+            className="flex items-center justify-start h-auto p-4 hover:bg-slate-50 border-slate-100"
+            onClick={action.onClick}
+          >
+            <div className={`p-2 rounded-lg ${action.bgColor} mr-4`}>
+              <action.icon className={`w-5 h-5 ${action.color}`} />
+            </div>
+            <div className="text-left">
+              <div className="font-semibold text-gray-900">{action.title}</div>
+              <div className="text-xs font-normal text-gray-500">{action.description}</div>
+            </div>
+          </Button>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

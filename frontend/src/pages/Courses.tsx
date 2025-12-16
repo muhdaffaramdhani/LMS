@@ -8,23 +8,13 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Progress } from "../components/ui/progress";
 import { useToast } from "../hooks/use-toast";
 import { courseService, Course as CourseType } from "../services/courseService";
 import { authService, UserData } from "../services/authService";
 import { 
-  Users, 
-  BookOpen, 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Loader2, 
-  Search, 
-  Clock, 
-  FileText, 
-  Video,
-  Star
+  Users, BookOpen, Search, Clock, FileText, Video, Star, Loader2, CheckCircle, Plus, Pencil, Trash2
 } from "lucide-react";
 
 export default function Courses() {
@@ -32,13 +22,13 @@ export default function Courses() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [courses, setCourses] = useState<CourseType[]>([]);
-  const [allCourses, setAllCourses] = useState<CourseType[]>([]);
   const [lecturers, setLecturers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all"); // 'all' or 'enrolled'
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
-  const [activeTab, setActiveTab] = useState("all");
-  
-  // Form State
+  const [enrollLoading, setEnrollLoading] = useState<number | null>(null);
+
+  // State untuk Dialog Add/Edit Course
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -52,50 +42,30 @@ export default function Courses() {
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const user = authService.getUser();
+  const isStudent = user?.role === 'student';
   const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
-    const query = searchParams.get("search") || "";
-    setSearchQuery(query);
-  }, [searchParams]);
-
+  // Fetch data setiap kali Tab berubah atau Search berubah
   useEffect(() => {
     fetchCourses();
     if (isAdmin) {
       fetchLecturers();
     }
-  }, []);
-
-  useEffect(() => {
-    let filtered = allCourses;
-
-    // Filter Search
-    if (searchQuery) {
-        const lower = searchQuery.toLowerCase();
-        filtered = filtered.filter(c => 
-            c.name.toLowerCase().includes(lower) || 
-            c.code.toLowerCase().includes(lower) ||
-            c.description.toLowerCase().includes(lower)
-        );
-    }
-
-    // Filter Tabs (Simulasi karena backend belum support status)
-    if (activeTab === "completed") {
-        // Simulasi kosong atau filter logic jika ada field status
-        filtered = []; 
-    }
-    // "ongoing" dan "all" kita anggap sama untuk sekarang karena data dummy
-
-    setCourses(filtered);
-  }, [searchQuery, allCourses, activeTab]);
+  }, [activeTab, searchQuery]);
 
   const fetchCourses = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const data = await courseService.getAll();
+      // Logic: Jika tab "enrolled", minta backend filter ?enrolled=true
+      // Jika tab "all", minta semua.
+      const isEnrolledTab = activeTab === "enrolled";
+      const data = await courseService.getAll({ 
+        enrolled: isEnrolledTab,
+        search: searchQuery 
+      });
+      
       // @ts-ignore
       const list = Array.isArray(data) ? data : data.results || [];
-      setAllCourses(list);
       setCourses(list);
     } catch (error) {
       console.error("Failed to fetch courses", error);
@@ -112,6 +82,27 @@ export default function Courses() {
       console.error("Failed to fetch lecturers", error);
     }
   };
+
+  const handleEnroll = async (courseId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Stop click bubbling to card
+    if (!isStudent) return;
+    
+    setEnrollLoading(courseId);
+    try {
+      await courseService.enroll(courseId);
+      toast({ title: "Success", description: "Successfully enrolled in the course!" });
+      
+      // Refresh list agar status berubah
+      fetchCourses();
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Failed to enroll.";
+      toast({ title: "Enrollment Failed", description: msg, variant: "destructive" });
+    } finally {
+      setEnrollLoading(null);
+    }
+  };
+
+  // --- Logic Tambahan untuk Admin (CRUD) ---
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,56 +165,57 @@ export default function Courses() {
     setImageFile(null);
   };
 
-  // Helper untuk warna ikon buku (Simulasi visual agar variatif)
+  // Helper colors
   const getCourseColor = (id: number) => {
     const colors = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500'];
     return colors[id % colors.length];
   }
 
-  // Helper simulasi rating
-  const getRating = (id: number) => (4 + (id % 10) / 10).toFixed(1);
-
   return (
     <MainLayout>
-      <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-10">
+      <div className="pb-10 mx-auto space-y-8 max-w-7xl animate-fade-in">
         
         {/* Header Section */}
         <div className="space-y-4">
-          <h1 className="text-3xl font-bold text-gray-900">My Courses</h1>
-          <p className="text-gray-500">Manage and track your enrolled courses</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {activeTab === 'enrolled' ? 'My Learning' : 'Course Catalog'}
+          </h1>
+          <p className="text-gray-500">
+            {activeTab === 'enrolled' ? 'Continue where you left off' : 'Explore new skills and knowledge'}
+          </p>
           
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-4">
-            {/* Tabs Filter */}
+          <div className="flex flex-col items-start justify-between gap-4 pt-4 md:flex-row md:items-center">
             <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-              <TabsList className="bg-gray-100 p-1">
-                <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-6">All Courses</TabsTrigger>
-                <TabsTrigger value="ongoing" className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-6">Ongoing</TabsTrigger>
-                <TabsTrigger value="completed" className="data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-6">Completed</TabsTrigger>
+              <TabsList className="p-1 bg-gray-100">
+                <TabsTrigger value="all" className="px-6">All Courses</TabsTrigger>
+                {isStudent && (
+                  <TabsTrigger value="enrolled" className="px-6">My Courses</TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
             
-            {/* Search & Add */}
-            <div className="flex gap-3 w-full md:w-auto">
-                <div className="relative flex-1 md:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex w-full gap-3 md:w-auto">
+                <div className="relative flex-1 max-w-sm md:w-72">
+                    <Search className="absolute w-4 h-4 -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
                     <Input 
-                        placeholder="Search courses, tasks..." 
-                        className="pl-9 bg-white border-gray-200"
+                        placeholder="Search courses..." 
+                        className="bg-white border-gray-200 pl-9"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
+
+                {/* Tombol Add Course HANYA untuk Admin */}
                 {isAdmin && (
                     <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if(!open) resetForm(); }}>
                         <DialogTrigger asChild>
-                            <Button className="bg-blue-600 hover:bg-blue-700 shadow-md">
+                            <Button className="bg-blue-600 shadow-md hover:bg-blue-700">
                                 <Plus className="w-4 h-4 mr-2" /> Add Course
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[500px]">
                             <DialogHeader><DialogTitle>{editingId ? "Edit" : "Add"} Course</DialogTitle></DialogHeader>
-                            <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                                {/* Form content same as before */}
+                            <form onSubmit={handleSubmit} className="py-4 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
                                     <label className="text-sm font-medium">Course Code</label>
@@ -269,100 +261,127 @@ export default function Courses() {
         </div>
 
         {/* Content Grid */}
-        {isLoading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin w-8 h-8 text-blue-500"/></div> : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {isLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-blue-500 animate-spin"/></div>
+        ) : (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {courses.length === 0 ? (
-                  <div className="col-span-full py-20 text-center">
-                    <BookOpen className="w-12 h-12 mx-auto text-gray-200 mb-4" />
-                    <p className="text-gray-500 text-lg">No courses found.</p>
+                  <div className="py-20 text-center col-span-full">
+                    <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-200" />
+                    <p className="text-lg text-gray-500">No courses found.</p>
+                    {activeTab === 'enrolled' && (
+                      <Button variant="link" onClick={() => setActiveTab('all')} className="text-lms-blue">
+                        Browse Catalog
+                      </Button>
+                    )}
                   </div>
                 ) : courses.map((course) => (
-                  <Card key={course.id} className="border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 bg-white group overflow-hidden">
+                  <Card 
+                    key={course.id} 
+                    className="transition-all duration-300 bg-white border border-gray-100 shadow-sm cursor-pointer hover:shadow-lg group"
+                    onClick={() => course.is_enrolled ? navigate(`/courses/${course.id}`) : null}
+                  >
                     <CardContent className="p-6">
                       <div className="flex gap-5">
-                        {/* Icon Box */}
                         <div className={`w-16 h-16 ${getCourseColor(course.id)} rounded-2xl flex items-center justify-center text-white shadow-md shrink-0`}>
                           <BookOpen className="w-8 h-8" />
                         </div>
                         
-                        {/* Header Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start">
+                          <div className="flex items-start justify-between">
                             <div>
-                              <h3 className="font-bold text-lg text-gray-900 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                              <h3 className="text-lg font-bold text-gray-900 transition-colors line-clamp-1 group-hover:text-blue-600">
                                 {course.name}
                               </h3>
-                              <p className="text-sm text-gray-500 font-medium">{course.code} • Dr. {course.lecturer_detail?.last_name || "Smith"}</p>
+                              <p className="text-sm font-medium text-gray-500">
+                                {course.code} • {course.lecturer_detail?.first_name || 'Dr.'} {course.lecturer_detail?.last_name || 'Teacher'}
+                              </p>
                             </div>
-                            <Badge variant="secondary" className="bg-blue-50 text-blue-700 font-semibold px-2">
-                                Ongoing
-                            </Badge>
+                            {course.is_enrolled && (
+                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
+                                    Enrolled
+                                </Badge>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                             <div className="flex items-center gap-1 text-orange-400 font-bold">
-                                <Star className="w-3.5 h-3.5 fill-current" /> {getRating(course.id)}
+                             <div className="flex items-center gap-1 font-bold text-orange-400">
+                                <Star className="w-3.5 h-3.5 fill-current" /> 4.8
                              </div>
                              <div className="flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5" /> {course.students_count || 42} students
+                                <Users className="w-3.5 h-3.5" /> {course.students_count || 0} students
                              </div>
                           </div>
                         </div>
                       </div>
 
                       <div className="mt-5">
-                        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                        <p className="text-sm leading-relaxed text-gray-500 line-clamp-2">
                             {course.description}
                         </p>
                       </div>
 
-                      {/* Progress Section */}
-                      <div className="mt-5">
-                        <div className="flex justify-between text-xs font-semibold mb-1.5">
-                            <span className="text-gray-500">Course Progress</span>
-                            <span className="text-gray-900">75%</span>
-                        </div>
-                        <Progress value={75} className="h-2 bg-gray-100" />
-                      </div>
+                      {course.is_enrolled && (
+                          <div className="mt-5">
+                            <div className="flex justify-between text-xs font-semibold mb-1.5">
+                                <span className="text-gray-500">Progress</span>
+                                <span className="text-gray-900">0%</span>
+                            </div>
+                            <Progress value={0} className="h-2 bg-gray-100" />
+                          </div>
+                      )}
 
-                      {/* Stats Row */}
-                      <div className="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-gray-50">
+                      <div className="grid grid-cols-3 gap-2 pt-6 mt-6 border-t border-gray-50">
                         <div className="text-center">
-                            <FileText className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                            <p className="text-xs font-bold text-gray-700">45</p>
+                            <FileText className="w-5 h-5 mx-auto mb-1 text-gray-400" />
+                            <p className="text-xs font-bold text-gray-700">--</p>
                             <p className="text-[10px] text-gray-400 uppercase font-semibold">Materials</p>
                         </div>
                         <div className="text-center border-l border-gray-100">
-                            <Video className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                            <p className="text-xs font-bold text-gray-700">12</p>
-                            <p className="text-[10px] text-gray-400 uppercase font-semibold">Assignments</p>
+                            <Video className="w-5 h-5 mx-auto mb-1 text-gray-400" />
+                            <p className="text-xs font-bold text-gray-700">--</p>
+                            <p className="text-[10px] text-gray-400 uppercase font-semibold">Tasks</p>
                         </div>
                         <div className="text-center border-l border-gray-100">
-                            <Clock className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                            <p className="text-xs font-bold text-gray-700">{course.duration_weeks || 16} Weeks</p>
+                            <Clock className="w-5 h-5 mx-auto mb-1 text-gray-400" />
+                            <p className="text-xs font-bold text-gray-700">{course.duration_weeks || 12} W</p>
                             <p className="text-[10px] text-gray-400 uppercase font-semibold">Duration</p>
                         </div>
                       </div>
 
                     </CardContent>
 
-                    <CardFooter className="px-6 pb-6 pt-0 flex items-center justify-between">
-                        <div className="text-xs text-gray-400 font-medium">
-                            Next class: <span className="text-gray-600">Monday, 10:00 AM</span>
-                        </div>
-                        <div className="flex gap-2">
-                             {isAdmin && (
-                                <>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-blue-600" onClick={(e) => {e.stopPropagation(); openEdit(course)}}><Pencil className="w-4 h-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDelete(course.id)}}><Trash2 className="w-4 h-4" /></Button>
-                                </>
-                             )}
-                            <Button 
-                                className="bg-gray-900 hover:bg-black text-white px-5 rounded-lg shadow-lg hover:shadow-xl transition-all"
-                                onClick={() => navigate(`/courses/${course.id}`)}
-                            >
-                                Enter Course
-                            </Button>
+                    <CardFooter className="flex items-center justify-between px-6 pt-0 pb-6">
+                        {/* Tombol Edit/Delete Khusus Admin */}
+                        {isAdmin && (
+                            <div className="flex gap-2 mr-2">
+                                <Button variant="ghost" size="icon" className="text-gray-400 h-9 w-9 hover:text-blue-600" onClick={(e) => {e.stopPropagation(); openEdit(course)}}><Pencil className="w-4 h-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-gray-400 h-9 w-9 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDelete(course.id)}}><Trash2 className="w-4 h-4" /></Button>
+                            </div>
+                        )}
+
+                        <div className="flex-1">
+                            {course.is_enrolled ? (
+                                <Button 
+                                    className="w-full text-white bg-gray-900 hover:bg-black"
+                                    onClick={() => navigate(`/courses/${course.id}`)}
+                                >
+                                    Enter Course
+                                </Button>
+                            ) : (
+                                <Button 
+                                    className={`w-full ${isStudent ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300'}`}
+                                    disabled={!isStudent || enrollLoading === course.id}
+                                    onClick={(e) => handleEnroll(course.id, e)}
+                                >
+                                    {enrollLoading === course.id ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <CheckCircle className="w-4 h-4 mr-2" /> 
+                                    )}
+                                    {isStudent ? "Enroll Now" : "Login as Student to Enroll"}
+                                </Button>
+                            )}
                         </div>
                     </CardFooter>
                   </Card>

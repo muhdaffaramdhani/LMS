@@ -1,72 +1,58 @@
 import api from '@/lib/axios';
+import { UserData } from './authService';
 
 export interface Course {
   id: number;
   name: string;
   code: string;
   description: string;
-  image?: string;
-  duration_weeks?: number;
   lecturer: number;
-  lecturer_detail: {
-    first_name: string;
-    last_name: string;
-    username: string;
-  };
+  lecturer_detail?: UserData;
+  duration_weeks?: number;
+  image?: string;
   students_count?: number;
-}
-
-export interface Enrollment {
-  id: number;
-  student: number;
-  course: number;
-  student_detail?: any;
+  is_enrolled?: boolean; // Tambahan penting dari serializer baru
 }
 
 export const courseService = {
-  getAll: async () => {
-    const response = await api.get<Course[]>('/courses/');
+  // Get All (Bisa filter enrolled atau search)
+  getAll: async (params?: { enrolled?: boolean; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.enrolled) query.append('enrolled', 'true');
+    if (params?.search) query.append('search', params.search);
+    
+    const response = await api.get<Course[]>(`/courses/?${query.toString()}`);
     return response.data;
   },
 
-  getById: async (id: string) => {
+  getById: async (id: number) => {
     const response = await api.get<Course>(`/courses/${id}/`);
     return response.data;
   },
 
-  create: async (formData: FormData) => {
-    const response = await api.post<Course>('/courses/', formData, {
+  create: async (data: FormData) => {
+    const response = await api.post('/courses/', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  update: async (id: number, formData: FormData) => {
-    const response = await api.patch<Course>(`/courses/${id}/`, formData, {
+  update: async (id: number, data: FormData) => {
+    const response = await api.patch(`/courses/${id}/`, data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
   delete: async (id: number) => {
-    await api.delete(`/courses/${id}/`);
-  },
-
-  // Enrollments
-  enrollStudent: async (courseId: number, studentId?: number) => {
-    // If studentId is not provided, backend might use current user (if logic exists) 
-    // or we pass the current user's ID from frontend context.
-    // Standard endpoint: POST /enrollments/ { course: 1, student: 2 }
-    const payload: any = { course: courseId };
-    if (studentId) payload.student = studentId;
-    
-    const response = await api.post('/enrollments/', payload);
+    const response = await api.delete(`/courses/${id}/`);
     return response.data;
   },
 
-  checkEnrollment: async () => {
-    // Get all enrollments for current user to check status
-    const response = await api.get('/enrollments/');
+  // Fitur Baru: Enroll
+  enroll: async (courseId: number) => {
+    // Memanggil endpoint action custom yang kita buat di backend
+    const response = await api.post(`/courses/${courseId}/enroll/`);
     return response.data;
   }
 };

@@ -1,40 +1,48 @@
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from .models import Assignment, Submission
 from .serializers import AssignmentSerializer, SubmissionSerializer
-from users.permissions import IsCourseOwner, IsSubmissionOwner, IsStudent
-
+from users.permissions import IsLecturerOrAdmin
 
 class AssignmentViewSet(viewsets.ModelViewSet):
-    """ViewSet untuk Assignment CRUD operations"""
+    # BARIS INI WAJIB ADA agar router tidak error "basename argument not specified"
     queryset = Assignment.objects.all()
-    serializer_class = AssignmentSerializer
     
-    def get_permissions(self):
-        # List and retrieve - anyone can view
-        if self.action in ['list', 'retrieve']:
-            return [IsAuthenticatedOrReadOnly()]
-        # Create, update, delete - course owner (lecturer) only
-        else:
-            return [IsCourseOwner()]
+    serializer_class = AssignmentSerializer
+    permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Assignment.objects.all()
+
+        # Jika user belum login (anonymous), return list kosong
+        if not user.is_authenticated:
+            return queryset.none()
+
+        # Jika student, HANYA tampilkan assignment dari course yang diambil
+        if user.role == 'student':
+            queryset = queryset.filter(course__enrollments__student=user)
+        
+        return queryset.order_by('due_date')
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsLecturerOrAdmin()]
+        return [IsAuthenticated()]
 
 class SubmissionViewSet(viewsets.ModelViewSet):
-    """ViewSet untuk Submission CRUD operations"""
     queryset = Submission.objects.all()
     serializer_class = SubmissionSerializer
-    
-    def get_permissions(self):
-        # List - authenticated users can list
-        if self.action == 'list':
-            return [IsAuthenticated()]
-        # Retrieve - submission owner (student) or lecturer
-        elif self.action == 'retrieve':
-            return [IsSubmissionOwner()]
-        # Create - students can submit
-        elif self.action == 'create':
-            return [IsStudent()]
-        # Update - submission owner or lecturer (for grading)
-        # Delete - submission owner only
-        else:
-            return [IsSubmissionOwner()]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        if not user.is_authenticated:
+            return Submission.objects.none()
+
+        # Student hanya melihat submission miliknya sendiri
+        if user.role == 'student':
+            return Submission.objects.filter(student=user)
+        # Dosen melihat semua submission
+        return Submission.objects.all()

@@ -1,52 +1,40 @@
 from django.db import models
 from django.conf import settings
 
-
 class Course(models.Model):
-    """Course Model"""
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=20, unique=True)
     description = models.TextField()
-    image = models.ImageField(upload_to='courses/', null=True, blank=True)
-    # Field baru untuk durasi minggu
-    duration_weeks = models.PositiveIntegerField(default=12, help_text="Duration in weeks")
-    
     lecturer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='taught_courses',
-        limit_choices_to={'role': 'lecturer'}
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        limit_choices_to={'role': 'lecturer'},
+        related_name='teaching_courses'
     )
+    duration_weeks = models.IntegerField(default=12)
+    image = models.ImageField(upload_to='courses/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        db_table = 'courses'
-        ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.code} - {self.name}"
 
-
 class Enrollment(models.Model):
-    """Enrollment Model - Students enrolled in courses"""
     student = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='enrollments',
-        limit_choices_to={'role': 'student'}
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='enrollments' # PENTING untuk filtering user.enrollments
     )
     course = models.ForeignKey(
-        Course,
-        on_delete=models.CASCADE,
-        related_name='enrollments'
+        Course, 
+        on_delete=models.CASCADE, 
+        related_name='enrollments' # PENTING untuk filtering course.enrollments
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
-        db_table = 'enrollments'
-        unique_together = ['student', 'course']
-        ordering = ['-created_at']
-    
+        unique_together = ['student', 'course'] # Mencegah double enroll
+        ordering = ['-enrolled_at']
+
     def __str__(self):
-        return f"{self.student.username} enrolled in {self.course.code}"
+        return f"{self.student.username} -> {self.course.code}"
