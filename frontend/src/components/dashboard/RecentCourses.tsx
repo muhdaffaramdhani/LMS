@@ -1,94 +1,86 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, ArrowRight, Loader2, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowRight, BookOpen, Clock } from "lucide-react";
+import { Link } from "react-router-dom";
 import { courseService, Course } from "@/services/courseService";
-import { authService } from "@/services/authService";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function RecentCourses() {
-  const navigate = useNavigate();
+const RecentCourses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const user = authService.getUser();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMyCourses = async () => {
+    const fetchCourses = async () => {
       try {
-        const data = await courseService.getAll({ enrolled: true });
-        // @ts-ignore
-        const list = Array.isArray(data) ? data : data.results || [];
-        setCourses(list.slice(0, 3)); 
+        const data = await courseService.getCourses();
+        // Ambil 3 kursus terbaru (atau 3 pertama)
+        setCourses(data.slice(0, 3));
       } catch (error) {
-        console.error("Failed to fetch recent courses", error);
+        console.error("Failed to fetch recent courses:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    if (user) {
-      fetchMyCourses();
-    }
-  }, [user]);
+    fetchCourses();
+  }, []);
 
-  const getCourseColor = (id: number) => {
-    const colors = ['bg-blue-100 text-blue-600', 'bg-purple-100 text-purple-600', 'bg-emerald-100 text-emerald-600', 'bg-orange-100 text-orange-600'];
-    return colors[id % colors.length];
+  if (loading) {
+    return (
+      <Card className="col-span-1">
+        <CardHeader>
+          <CardTitle>Recent Courses</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="w-full h-20" />
+          <Skeleton className="w-full h-20" />
+          <Skeleton className="w-full h-20" />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card className="border-gray-100 shadow-sm col-span-full lg:col-span-4">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xl font-bold text-gray-800">
-          {user?.role === 'student' ? 'My Courses' : 'Courses newly added'}
-        </CardTitle>
-        <Button variant="ghost" className="h-auto p-0 text-sm font-normal text-blue-600 hover:text-blue-700" onClick={() => navigate('/courses')}>
-          View All <ArrowRight className="w-4 h-4 ml-1" />
+    <Card className="col-span-1">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-xl font-bold">Recent Courses</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/courses" className="text-primary hover:text-primary/80">
+            View All <ArrowRight className="w-4 h-4 ml-2" />
+          </Link>
         </Button>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="py-8 text-center text-gray-500 border border-dashed rounded-lg bg-gray-50">
-            <p className="text-sm">No courses taken yet.</p>
-            <Button variant="link" onClick={() => navigate('/courses')} className="mt-2 text-blue-600">
-              Search Courses
-            </Button>
-          </div>
+        {courses.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No courses available yet.</p>
         ) : (
           courses.map((course) => (
-            <div key={course.id} className="flex items-center gap-4 p-3 transition-all border border-transparent cursor-pointer group rounded-xl hover:bg-gray-50 hover:border-gray-100" onClick={() => navigate(`/courses/${course.id}`)}>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${getCourseColor(course.id)}`}>
-                <BookOpen className="w-6 h-6" />
+            <div
+              key={course.id}
+              className="flex items-center p-3 space-x-4 transition-colors border rounded-lg hover:bg-muted/50"
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary">
+                <BookOpen className="w-5 h-5" />
               </div>
-              
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-gray-900 truncate transition-colors group-hover:text-blue-600">
-                  {course.name}
-                </h4>
-                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium text-gray-700">{course.code}</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3 h-3" /> {course.students_count || 0} Siswa
-                  </span>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium leading-none">{course.title}</p>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {course.duration || "Self-paced"}
                 </div>
               </div>
-
-              <div className="text-right">
-                 <Badge variant="secondary" className="text-gray-600 bg-white border border-gray-200">
-                    Active
-                 </Badge>
-              </div>
+              <Button variant="ghost" size="icon" asChild>
+                <Link to={`/courses/${course.id}`}>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
             </div>
           ))
         )}
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RecentCourses;

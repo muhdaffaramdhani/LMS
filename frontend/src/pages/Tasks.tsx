@@ -178,20 +178,20 @@ export default function Tasks() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto animate-fade-in pb-10">
+      <div className="max-w-6xl pb-10 mx-auto animate-fade-in">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col items-center justify-between gap-4 mb-8 md:flex-row">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
-            <p className="text-muted-foreground mt-1">Track and manage all your assignments and deadlines</p>
+            <p className="mt-1 text-muted-foreground">Track and manage all your assignments and deadlines</p>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center w-full gap-3 md:w-auto">
             <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute w-4 h-4 -translate-y-1/2 left-3 top-1/2 text-muted-foreground" />
               <Input 
                 placeholder="Search tasks..." 
-                className="pl-9 bg-white" 
+                className="bg-white pl-9" 
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
               />
@@ -200,7 +200,7 @@ export default function Tasks() {
             {canAdd && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => {setIsDialogOpen(open); if(!open) resetForm()}}>
                 <DialogTrigger asChild>
-                    <Button className="bg-gray-900 hover:bg-black text-white">
+                    <Button className="text-white bg-gray-900 hover:bg-black">
                         <Plus className="w-4 h-4 mr-2" /> Create Task
                     </Button>
                 </DialogTrigger>
@@ -208,7 +208,7 @@ export default function Tasks() {
                   <DialogHeader>
                     <DialogTitle>{editingId ? "Edit Task" : "Create New Task"}</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                  <form onSubmit={handleSubmit} className="py-4 space-y-4">
                     <div className="space-y-2">
                         <Label>Task Title</Label>
                         <Input placeholder="e.g. Final Project Report" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
@@ -231,7 +231,7 @@ export default function Tasks() {
                         <Textarea placeholder="Task details..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
                     </div>
                     <DialogFooter>
-                        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "Save Task"}</Button>
+                        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Task"}</Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
@@ -241,10 +241,10 @@ export default function Tasks() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-red-50 border-none shadow-sm">
-                <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-red-100 rounded-xl text-red-600">
+        <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-3">
+            <Card className="border-none shadow-sm bg-red-50">
+                <CardContent className="flex items-center gap-4 p-6">
+                    <div className="p-3 text-red-600 bg-red-100 rounded-xl">
                         <AlertCircle className="w-6 h-6" />
                     </div>
                     <div>
@@ -253,9 +253,9 @@ export default function Tasks() {
                     </div>
                 </CardContent>
             </Card>
-            <Card className="bg-orange-50 border-none shadow-sm">
-                <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-orange-100 rounded-xl text-orange-600">
+            <Card className="border-none shadow-sm bg-orange-50">
+                <CardContent className="flex items-center gap-4 p-6">
+                    <div className="p-3 text-orange-600 bg-orange-100 rounded-xl">
                         <Clock className="w-6 h-6" />
                     </div>
                     <div>
@@ -264,9 +264,9 @@ export default function Tasks() {
                     </div>
                 </CardContent>
             </Card>
-            <Card className="bg-green-50 border-none shadow-sm">
-                <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-green-100 rounded-xl text-green-600">
+            <Card className="border-none shadow-sm bg-green-50">
+                <CardContent className="flex items-center gap-4 p-6">
+                    <div className="p-3 text-green-600 bg-green-100 rounded-xl">
                         <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <div>
@@ -279,7 +279,7 @@ export default function Tasks() {
 
         {/* Tabs & List */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="mb-6 bg-transparent p-0 gap-6 h-auto border-b border-gray-200 w-full justify-start rounded-none">
+            <TabsList className="justify-start w-full h-auto gap-6 p-0 mb-6 bg-transparent border-b border-gray-200 rounded-none">
                 {["all", "pending", "in-progress", "completed"].map((tab) => (
                     <TabsTrigger 
                         key={tab} 
@@ -291,19 +291,19 @@ export default function Tasks() {
                 ))}
             </TabsList>
 
-            <TabsContent value={activeTab} className="space-y-4 mt-0">
+            <TabsContent value={activeTab} className="mt-0 space-y-4">
                 {isLoading ? (
-                    <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-gray-400"/></div>
+                    <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-gray-400 animate-spin"/></div>
                 ) : filteredTasks.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
+                    <div className="py-12 text-center border border-dashed bg-gray-50 rounded-xl">
                         <p className="text-gray-500">No tasks found in this category.</p>
                     </div>
                 ) : (
                     filteredTasks.map((task) => {
                         const status = taskStatuses[task.id] || 'pending';
                         return (
-                            <Card key={task.id} className="border border-gray-100 shadow-sm hover:shadow-md transition-all bg-white group">
-                                <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
+                            <Card key={task.id} className="transition-all bg-white border border-gray-100 shadow-sm hover:shadow-md group">
+                                <CardContent className="flex flex-col items-start gap-6 p-6 md:flex-row md:items-center">
                                     {/* Left: Radio/Status Indicator */}
                                     <div className="pt-1 md:pt-0">
                                         <button 
@@ -323,13 +323,13 @@ export default function Tasks() {
                                                 </h3>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className={`w-2 h-2 rounded-full ${task.course % 2 === 0 ? 'bg-blue-500' : 'bg-purple-500'}`}></span>
-                                                    <span className="text-sm text-gray-500 font-medium">
+                                                    <span className="text-sm font-medium text-gray-500">
                                                         {task.course_detail?.name || 'General Task'}
                                                     </span>
                                                 </div>
                                             </div>
                                             {/* Badges on Desktop */}
-                                            <div className="hidden md:flex gap-2">
+                                            <div className="hidden gap-2 md:flex">
                                                 {getPriorityBadge(task.id)}
                                                 <Badge variant="secondary" className="text-[10px] bg-gray-100 text-gray-600 px-2 border-0">Assignment</Badge>
                                             </div>
@@ -337,7 +337,7 @@ export default function Tasks() {
 
                                         <p className="text-sm text-gray-500 line-clamp-2">{task.description}</p>
                                         
-                                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 pt-2">
+                                        <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-gray-400">
                                             <div className="flex items-center gap-1.5">
                                                 <Calendar className="w-4 h-4" />
                                                 {format(new Date(task.due_date), "MMM dd, yyyy")}
@@ -356,7 +356,7 @@ export default function Tasks() {
                                     {/* Right: Actions */}
                                     <div className="flex flex-col gap-2 min-w-[140px] md:items-end mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
                                         {/* Mobile Badges */}
-                                        <div className="flex md:hidden gap-2 mb-2">
+                                        <div className="flex gap-2 mb-2 md:hidden">
                                             {getPriorityBadge(task.id)}
                                             <Badge variant="secondary" className="text-[10px] bg-gray-100 text-gray-600">Assignment</Badge>
                                         </div>
@@ -366,21 +366,21 @@ export default function Tasks() {
                                                 <Button variant="outline" size="sm" onClick={() => handleEdit(task)}>
                                                     <Pencil className="w-4 h-4 mr-2" /> Edit
                                                 </Button>
-                                                <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200" onClick={() => handleDelete(task.id)}>
+                                                <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(task.id)}>
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>
                                         ) : (
                                             status !== 'completed' ? (
                                                 <Button 
-                                                    className="bg-gray-900 hover:bg-black text-white w-full md:w-auto" 
+                                                    className="w-full text-white bg-gray-900 hover:bg-black md:w-auto" 
                                                     size="sm"
                                                     onClick={() => updateTaskStatus(task.id, 'in-progress')}
                                                 >
                                                     Start Task
                                                 </Button>
                                             ) : (
-                                                <Button variant="outline" className="w-full md:w-auto text-green-600 border-green-200 bg-green-50" size="sm" disabled>
+                                                <Button variant="outline" className="w-full text-green-600 border-green-200 md:w-auto bg-green-50" size="sm" disabled>
                                                     Completed
                                                 </Button>
                                             )

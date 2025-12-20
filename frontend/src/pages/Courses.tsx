@@ -305,9 +305,6 @@ export default function Courses() {
                           </div>
                           
                           <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                             <div className="flex items-center gap-1 font-bold text-orange-400">
-                                <Star className="w-3.5 h-3.5 fill-current" /> 4.8
-                             </div>
                              <div className="flex items-center gap-1">
                                 <Users className="w-3.5 h-3.5" /> {course.students_count || 0} students
                              </div>
